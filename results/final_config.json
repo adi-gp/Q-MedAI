@@ -1,0 +1,61 @@
+{
+  "experiment_label": "FINAL EXPERIMENT",
+  "dataset": {
+    "path": "data/breast_cancer.csv",
+    "source": "local CSV (data/breast_cancer.csv)",
+    "sample_count": 569,
+    "feature_count": 30,
+    "class_distribution": {
+      "0": 357,
+      "1": 212
+    },
+    "removed_columns": [
+      {
+        "column": "id",
+        "reason": "identifier column"
+      },
+      {
+        "column": "Unnamed: 32",
+        "reason": "blank or unnamed index column"
+      }
+    ],
+    "provenance_status": "Source provenance not independently verified from supplied project files"
+  },
+  "preprocessing": "SelectKBest",
+  "feature_count": 4,
+  "selected_features_full_data": [
+    "concave points_mean",
+    "radius_worst",
+    "perimeter_worst",
+    "concave points_worst"
+  ],
+  "selected_features_matched_data": [
+    "concave points_mean",
+    "radius_worst",
+    "perimeter_worst",
+    "concave points_worst"
+  ],
+  "random_seed": 42,
+  "test_size": 0.2,
+  "train_test_split": "stratified train_test_split with random_state=42",
+  "target_encoding": {
+    "B": 0,
+    "M": 1
+  },
+  "positive_class": "M = malignant = 1",
+  "vqc": {
+    "qubits": 4,
+    "layers": 3,
+    "iterations": 100,
+    "encoding": "RY",
+    "ansatz": "RX/RY/RZ rotations with CNOT ring",
+    "measurement": "PauliZ expectation converted to (1 + <Z>) / 2"
+  },
+  "quantum_kernel": {
+    "subset_size": 150,
+    "kernel": "fidelity-based RY feature map",
+    "evaluation_matrix": "test x train only"
+  },
+  "backend": "PennyLane default.qubit \u2014 classical quantum-circuit simulation",
+  "timeout_seconds": 600
+}
