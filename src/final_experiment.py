@@ -210,6 +210,14 @@ def _write_csv(records: list[dict[str, Any]]) -> None:
             writer.writerow({field: record.get(field) for field in fields})
 
 
+def _artifact_plot_path(path: Path) -> str:
+    """Keep local artifacts relative while allowing Kaggle working-directory output."""
+    try:
+        return str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
+
+
 def _save_roc_plot(records: list[dict[str, Any]], condition: str, filename: str) -> str | None:
     successful = [row for row in records if row["roc_curve"] is not None]
     if not successful:
@@ -231,7 +239,7 @@ def _save_roc_plot(records: list[dict[str, Any]], condition: str, filename: str)
     path = PLOTS_DIR / filename
     figure.savefig(path, dpi=180)
     plt.close(figure)
-    return str(path.relative_to(PROJECT_ROOT))
+    return _artifact_plot_path(path)
 
 
 def _save_confusion_plot(records: list[dict[str, Any]], condition: str, filename: str) -> str | None:
@@ -260,7 +268,7 @@ def _save_confusion_plot(records: list[dict[str, Any]], condition: str, filename
     path = PLOTS_DIR / filename
     figure.savefig(path, dpi=180)
     plt.close(figure)
-    return str(path.relative_to(PROJECT_ROOT))
+    return _artifact_plot_path(path)
 
 
 def _save_metric_plot(records: list[dict[str, Any]], metric: str, filename: str) -> str | None:
@@ -282,7 +290,7 @@ def _save_metric_plot(records: list[dict[str, Any]], metric: str, filename: str)
     path = PLOTS_DIR / filename
     figure.savefig(path, dpi=180)
     plt.close(figure)
-    return str(path.relative_to(PROJECT_ROOT))
+    return _artifact_plot_path(path)
 
 
 def _save_plots(full_records: list[dict[str, Any]], matched_records: list[dict[str, Any]]) -> list[str]:
