@@ -148,6 +148,33 @@ def test_prediction_rejects_embedded_bundle_semantic_mismatch_before_any_score(r
         predict_patient(artifacts, _values())
 
 
+@pytest.mark.parametrize(
+    ("role", "field", "value"),
+    [
+        ("quantum", "selected_indices", np.array([0, 1, 2, 3])),
+        ("hybrid", "selected_indices", "0,1,2,3"),
+        ("quantum", "selected_indices", [0, 1, 2, "3"]),
+        ("hybrid", "selected_indices", [0, 1, 2, True]),
+        ("classical", "feature_order", np.array([field.name for field in PATIENT_FIELDS])),
+        ("quantum", "feature_order", "not-a-list"),
+        ("hybrid", "feature_order", [*([field.name for field in PATIENT_FIELDS][:-1]), True]),
+        ("quantum", "n_qubits", np.int64(4)),
+        ("hybrid", "n_qubits", True),
+    ],
+)
+def test_prediction_rejects_malformed_embedded_metadata_types_before_any_score(role, field, value):
+    artifacts = _artifacts()
+    getattr(artifacts, role)[field] = value
+    artifacts.classical["model"] = NeverScore()
+    artifacts.quantum["qsvc"] = NeverScore()
+    artifacts.hybrid["classical_base_model"] = NeverScore()
+    artifacts.hybrid["qsvc"] = NeverScore()
+    artifacts.hybrid["meta_model"] = NeverScore()
+
+    with pytest.raises(PatientValidationError, match=field):
+        predict_patient(artifacts, _values())
+
+
 @pytest.mark.parametrize("coefficients", [["not-a-number"], np.ones(14), np.ones((1, 1, 15))])
 def test_prediction_translates_corrupt_contribution_coefficients_to_domain_error(coefficients):
     artifacts = _artifacts()

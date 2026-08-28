@@ -2,6 +2,13 @@
 
 The returned values are research-model scores.  Feature contributions describe
 model associations only; they do not establish clinical causality.
+
+``predict_patient`` accepts only verified frozen bundles.  Every classical,
+quantum, and hybrid bundle must embed the exact built-in-list ``feature_order``
+from the manifest.  Quantum and hybrid bundles must additionally embed exact
+built-in-list ``selected_indices``, built-in-int ``n_qubits``, and string
+``feature_map_version`` values equal to the manifest.  There is deliberately
+no compatibility fallback for incomplete or semantically mismatched bundles.
 """
 
 from __future__ import annotations
@@ -48,6 +55,23 @@ PATIENT_FIELDS = (
 )
 
 _FIELD_NAMES = tuple(field.name for field in PATIENT_FIELDS)
+
+
+def _is_feature_order(value: Any, expected: list[str]) -> bool:
+    return (
+        type(value) is list
+        and all(type(name) is str for name in value)
+        and value == expected
+    )
+
+
+def _is_selected_indices(value: Any) -> bool:
+    return (
+        type(value) is list
+        and bool(value)
+        and all(type(index) is int and 0 <= index < len(_FIELD_NAMES) for index in value)
+        and len(set(value)) == len(value)
+    )
 
 
 def validate_patient(values: Mapping[str, float], feature_order: list[str]) -> np.ndarray:
@@ -132,16 +156,11 @@ def _manifest_contract(artifacts: FraminghamArtifacts) -> tuple[list[str], list[
     n_qubits = quantum.get("n_qubits")
     if feature_map.get("version") != FEATURE_MAP_VERSION:
         raise PatientValidationError("Artifact feature-map version is not the verified Framingham notebook feature map.")
-    if not isinstance(feature_order, list) or list(feature_order) != list(_FIELD_NAMES):
+    if not _is_feature_order(feature_order, list(_FIELD_NAMES)):
         raise PatientValidationError("Artifact feature order does not match the exact 15-field Framingham contract.")
-    if (
-        not isinstance(indices, list)
-        or not indices
-        or len(set(indices)) != len(indices)
-        or not all(isinstance(index, int) and not isinstance(index, bool) and 0 <= index < len(_FIELD_NAMES) for index in indices)
-    ):
+    if not _is_selected_indices(indices):
         raise PatientValidationError("Artifact quantum selected feature indices are invalid for the Framingham contract.")
-    if isinstance(n_qubits, bool) or not isinstance(n_qubits, int) or n_qubits != len(indices):
+    if type(n_qubits) is not int or n_qubits != len(indices):
         raise PatientValidationError("Artifact n_qubits must exactly match the selected quantum feature count.")
     return list(feature_order), list(indices), n_qubits, FEATURE_MAP_VERSION
 
@@ -163,14 +182,15 @@ def _verified_bundle(
     if not isinstance(manifest_version, str) or bundle.get("model_version_id") != manifest_version:
         raise PatientValidationError(f"Verified {role} bundle model_version_id does not match the manifest.")
     bundle_feature_order = bundle.get("feature_order")
-    if not isinstance(bundle_feature_order, list) or bundle_feature_order != feature_order:
+    if not _is_feature_order(bundle_feature_order, feature_order):
         raise PatientValidationError(f"Verified {role} bundle feature_order does not match the manifest.")
     if role in ("quantum", "hybrid"):
-        if bundle.get("selected_indices") != indices:
+        bundle_indices = bundle.get("selected_indices")
+        if not _is_selected_indices(bundle_indices) or bundle_indices != indices:
             raise PatientValidationError(f"Verified {role} bundle selected_indices do not match the manifest.")
-        if bundle.get("n_qubits") != n_qubits:
+        if type(bundle.get("n_qubits")) is not int or bundle["n_qubits"] != n_qubits:
             raise PatientValidationError(f"Verified {role} bundle n_qubits does not match the manifest.")
-        if bundle.get("feature_map_version") != feature_map_version:
+        if type(bundle.get("feature_map_version")) is not str or bundle["feature_map_version"] != feature_map_version:
             raise PatientValidationError(f"Verified {role} bundle feature_map_version does not match the manifest.")
     return bundle
 
@@ -229,7 +249,13 @@ def _kernel(bundle: Mapping[str, Any], transformed: np.ndarray, indices: list[in
 
 
 def predict_patient(artifacts: FraminghamArtifacts, values: Mapping[str, float]) -> InferenceResult:
-    """Score one patient with verified frozen bundles; nothing is stored."""
+    """Score one patient only after strict embedded bundle metadata validation.
+
+    The required embedded metadata is intentionally non-optional: every bundle
+    carries the manifest's exact ``feature_order``; quantum and hybrid bundles
+    also carry equal ``selected_indices``, ``n_qubits``, and
+    ``feature_map_version``.  Patient inputs are not stored.
+    """
     feature_order, indices, n_qubits, feature_map_version = _manifest_contract(artifacts)
     classical = _verified_bundle(
         artifacts, "classical", ("preprocess", "model"), feature_order, indices, n_qubits, feature_map_version,
