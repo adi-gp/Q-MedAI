@@ -19,7 +19,7 @@ def test_framingham_evidence_matches_executed_notebook():
     assert by_name["Hybrid CML + QML"].roc_auc == pytest.approx(0.7062)
     assert by_name["Quantum Kernel SVM"].roc_auc == pytest.approx(0.6581)
     assert evidence.calibration_status == "NOT_DEMONSTRATED"
-    assert (ROOT / evidence.source).exists()
+    assert (ROOT / evidence.cohort["source_artifact"]).exists()
 
 
 def test_breast_cancer_adapter_preserves_matched_quantum_result():
