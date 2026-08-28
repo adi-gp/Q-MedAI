@@ -31,6 +31,17 @@ class FixedMeta:
         return np.c_[1.0 - score, score]
 
 
+class NeverScore:
+    def predict_proba(self, values):
+        pytest.fail("semantic bundle validation must occur before scoring")
+
+
+class CoefficientModel(FixedModel):
+    def __init__(self, positive, coefficients):
+        super().__init__(positive)
+        self.coef_ = coefficients
+
+
 def _values():
     return {field.name: field.default for field in PATIENT_FIELDS}
 
@@ -52,9 +63,9 @@ def _artifacts(*, manifest=None, quantum_states=None, hybrid_states=None):
     }
     return FraminghamArtifacts(
         manifest=manifest,
-        classical={"model_version_id": version, "preprocess": IdentityPreprocess(), "model": FixedModel(0.2)},
-        quantum={"model_version_id": version, "preprocess": IdentityPreprocess(), "train_states": np.asarray([state]) if quantum_states is None else quantum_states, "qsvc": FixedModel(0.4)},
-        hybrid={"model_version_id": version, "preprocess": IdentityPreprocess(), "classical_base_model": FixedModel(0.3), "train_states": np.asarray([state]) if hybrid_states is None else hybrid_states, "qsvc": FixedModel(0.5), "meta_model": FixedMeta()},
+        classical={"model_version_id": version, "feature_order": names, "preprocess": IdentityPreprocess(), "model": FixedModel(0.2)},
+        quantum={"model_version_id": version, "feature_order": names, "selected_indices": [0, 1, 2, 3], "n_qubits": 4, "feature_map_version": "framingham_v1_h_rz_cz_reupload", "preprocess": IdentityPreprocess(), "train_states": np.asarray([state]) if quantum_states is None else quantum_states, "qsvc": FixedModel(0.4)},
+        hybrid={"model_version_id": version, "feature_order": names, "selected_indices": [0, 1, 2, 3], "n_qubits": 4, "feature_map_version": "framingham_v1_h_rz_cz_reupload", "preprocess": IdentityPreprocess(), "classical_base_model": FixedModel(0.3), "train_states": np.asarray([state]) if hybrid_states is None else hybrid_states, "qsvc": FixedModel(0.5), "meta_model": FixedMeta()},
     )
 
 
@@ -108,3 +119,39 @@ def test_prediction_rejects_manifest_qubit_count_mismatch_before_scoring():
 def test_prediction_translates_quantum_state_dimension_mismatch_to_domain_error():
     with pytest.raises(PatientValidationError, match="dimensions"):
         predict_patient(_artifacts(quantum_states=np.ones((1, 3))), _values())
+
+
+@pytest.mark.parametrize(
+    ("role", "field", "value"),
+    [
+        ("classical", "feature_order", ["age"]),
+        ("quantum", "feature_order", ["age"]),
+        ("hybrid", "feature_order", ["age"]),
+        ("quantum", "selected_indices", [3, 2, 1, 0]),
+        ("hybrid", "selected_indices", [3, 2, 1, 0]),
+        ("quantum", "n_qubits", 3),
+        ("hybrid", "n_qubits", 3),
+        ("quantum", "feature_map_version", "other-map"),
+        ("hybrid", "feature_map_version", "other-map"),
+    ],
+)
+def test_prediction_rejects_embedded_bundle_semantic_mismatch_before_any_score(role, field, value):
+    artifacts = _artifacts()
+    getattr(artifacts, role)[field] = value
+    artifacts.classical["model"] = NeverScore()
+    artifacts.quantum["qsvc"] = NeverScore()
+    artifacts.hybrid["classical_base_model"] = NeverScore()
+    artifacts.hybrid["qsvc"] = NeverScore()
+    artifacts.hybrid["meta_model"] = NeverScore()
+
+    with pytest.raises(PatientValidationError, match=field):
+        predict_patient(artifacts, _values())
+
+
+@pytest.mark.parametrize("coefficients", [["not-a-number"], np.ones(14), np.ones((1, 1, 15))])
+def test_prediction_translates_corrupt_contribution_coefficients_to_domain_error(coefficients):
+    artifacts = _artifacts()
+    artifacts.classical["model"] = CoefficientModel(0.2, coefficients)
+
+    with pytest.raises(PatientValidationError, match="coefficients"):
+        predict_patient(artifacts, _values())

@@ -123,7 +123,7 @@ def _mapping(value: Any, label: str) -> Mapping[str, Any]:
     return value
 
 
-def _manifest_contract(artifacts: FraminghamArtifacts) -> tuple[list[str], list[int], int]:
+def _manifest_contract(artifacts: FraminghamArtifacts) -> tuple[list[str], list[int], int, str]:
     manifest = _mapping(artifacts.manifest, "manifest")
     feature_order = manifest.get("feature_order")
     quantum = _mapping(manifest.get("quantum"), "manifest quantum")
@@ -143,10 +143,18 @@ def _manifest_contract(artifacts: FraminghamArtifacts) -> tuple[list[str], list[
         raise PatientValidationError("Artifact quantum selected feature indices are invalid for the Framingham contract.")
     if isinstance(n_qubits, bool) or not isinstance(n_qubits, int) or n_qubits != len(indices):
         raise PatientValidationError("Artifact n_qubits must exactly match the selected quantum feature count.")
-    return list(feature_order), list(indices), n_qubits
+    return list(feature_order), list(indices), n_qubits, FEATURE_MAP_VERSION
 
 
-def _verified_bundle(artifacts: FraminghamArtifacts, role: str, required: tuple[str, ...]) -> Mapping[str, Any]:
+def _verified_bundle(
+    artifacts: FraminghamArtifacts,
+    role: str,
+    required: tuple[str, ...],
+    feature_order: list[str],
+    indices: list[int],
+    n_qubits: int,
+    feature_map_version: str,
+) -> Mapping[str, Any]:
     bundle = _mapping(getattr(artifacts, role), role)
     missing = [name for name in required if name not in bundle]
     if missing:
@@ -154,6 +162,16 @@ def _verified_bundle(artifacts: FraminghamArtifacts, role: str, required: tuple[
     manifest_version = artifacts.manifest.get("model_version_id")
     if not isinstance(manifest_version, str) or bundle.get("model_version_id") != manifest_version:
         raise PatientValidationError(f"Verified {role} bundle model_version_id does not match the manifest.")
+    bundle_feature_order = bundle.get("feature_order")
+    if not isinstance(bundle_feature_order, list) or bundle_feature_order != feature_order:
+        raise PatientValidationError(f"Verified {role} bundle feature_order does not match the manifest.")
+    if role in ("quantum", "hybrid"):
+        if bundle.get("selected_indices") != indices:
+            raise PatientValidationError(f"Verified {role} bundle selected_indices do not match the manifest.")
+        if bundle.get("n_qubits") != n_qubits:
+            raise PatientValidationError(f"Verified {role} bundle n_qubits does not match the manifest.")
+        if bundle.get("feature_map_version") != feature_map_version:
+            raise PatientValidationError(f"Verified {role} bundle feature_map_version does not match the manifest.")
     return bundle
 
 
@@ -185,9 +203,17 @@ def _contributions(bundle: Mapping[str, Any], transformed: np.ndarray, feature_o
     model = bundle["model"]
     if not hasattr(model, "coef_"):
         return ()
-    coefficients = np.asarray(model.coef_, dtype=float).reshape(-1)
-    if len(coefficients) != transformed.shape[1]:
-        return ()
+    try:
+        coefficients = np.asarray(model.coef_, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise PatientValidationError("Verified classical model coefficients are not numeric.") from exc
+    if (
+        coefficients.ndim != 2
+        or coefficients.shape != (1, transformed.shape[1])
+        or not np.all(np.isfinite(coefficients))
+    ):
+        raise PatientValidationError("Verified classical model coefficients have incompatible dimensions.")
+    coefficients = coefficients[0]
     rows = [(name, float(value * weight)) for name, value, weight in zip(feature_order, transformed[0], coefficients)]
     return tuple(sorted(rows, key=lambda item: abs(item[1]), reverse=True))
 
@@ -204,10 +230,17 @@ def _kernel(bundle: Mapping[str, Any], transformed: np.ndarray, indices: list[in
 
 def predict_patient(artifacts: FraminghamArtifacts, values: Mapping[str, float]) -> InferenceResult:
     """Score one patient with verified frozen bundles; nothing is stored."""
-    feature_order, indices, n_qubits = _manifest_contract(artifacts)
-    classical = _verified_bundle(artifacts, "classical", ("preprocess", "model"))
-    quantum = _verified_bundle(artifacts, "quantum", ("preprocess", "train_states", "qsvc"))
-    hybrid = _verified_bundle(artifacts, "hybrid", ("preprocess", "classical_base_model", "train_states", "qsvc", "meta_model"))
+    feature_order, indices, n_qubits, feature_map_version = _manifest_contract(artifacts)
+    classical = _verified_bundle(
+        artifacts, "classical", ("preprocess", "model"), feature_order, indices, n_qubits, feature_map_version,
+    )
+    quantum = _verified_bundle(
+        artifacts, "quantum", ("preprocess", "train_states", "qsvc"), feature_order, indices, n_qubits, feature_map_version,
+    )
+    hybrid = _verified_bundle(
+        artifacts, "hybrid", ("preprocess", "classical_base_model", "train_states", "qsvc", "meta_model"),
+        feature_order, indices, n_qubits, feature_map_version,
+    )
     raw = validate_patient(values, feature_order)
 
     classical_x = _transform(classical, raw, "classical")
