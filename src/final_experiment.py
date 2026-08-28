@@ -293,6 +293,187 @@ def _save_metric_plot(records: list[dict[str, Any]], metric: str, filename: str)
     return _artifact_plot_path(path)
 
 
+def _quantum_kernel_vs_random_forest(
+    matched_records: list[dict[str, Any]],
+) -> dict[str, float | int] | None:
+    """Return the evidence-supported matched-data head-to-head comparison."""
+    by_name = {row["model"]: row for row in matched_records}
+    quantum_kernel = by_name.get("Quantum Kernel SVM")
+    random_forest = by_name.get("Random Forest")
+    if not quantum_kernel or not random_forest:
+        return None
+    required = ("accuracy", "recall", "f1", "roc_auc", "confusion_matrix")
+    if any(row.get(key) is None for row in (quantum_kernel, random_forest) for key in required):
+        return None
+    quantum_false_negatives = int(quantum_kernel["confusion_matrix"][1][0])
+    random_forest_false_negatives = int(random_forest["confusion_matrix"][1][0])
+    return {
+        "accuracy_difference": round(quantum_kernel["accuracy"] - random_forest["accuracy"], 4),
+        "sensitivity_difference": round(quantum_kernel["recall"] - random_forest["recall"], 4),
+        "f1_difference": round(quantum_kernel["f1"] - random_forest["f1"], 4),
+        "roc_auc_difference": round(quantum_kernel["roc_auc"] - random_forest["roc_auc"], 4),
+        "quantum_false_negatives": quantum_false_negatives,
+        "random_forest_false_negatives": random_forest_false_negatives,
+        "fewer_malignant_cases_missed": random_forest_false_negatives - quantum_false_negatives,
+    }
+
+
+def _save_judge_summary_plot(
+    matched_records: list[dict[str, Any]],
+    filename: str,
+) -> str | None:
+    """Render the fair matched-data result as one presentation-ready figure."""
+    successful = [
+        row
+        for row in matched_records
+        if row.get("status") == STATUS_COMPLETED
+        and all(
+            row.get(metric) is not None
+            for metric in ("accuracy", "recall", "specificity", "f1", "roc_auc")
+        )
+    ]
+    if not successful:
+        return None
+
+    metric_specs = [
+        ("accuracy", "Accuracy"),
+        ("recall", "Sensitivity"),
+        ("specificity", "Specificity"),
+        ("f1", "F1"),
+        ("roc_auc", "ROC-AUC"),
+    ]
+    colors = {
+        "Logistic Regression": "#2563EB",
+        "RBF SVM": "#0891B2",
+        "Random Forest": "#16A34A",
+        "Quantum Kernel SVM": "#E11D48",
+    }
+
+    figure, (metric_axis, miss_axis) = plt.subplots(
+        1,
+        2,
+        figsize=(17, 7.5),
+        gridspec_kw={"width_ratios": [1.75, 1]},
+    )
+    x_positions = np.arange(len(metric_specs))
+    width = min(0.18, 0.8 / len(successful))
+    offsets = (np.arange(len(successful)) - (len(successful) - 1) / 2) * width
+    all_values: list[float] = []
+
+    for offset, row in zip(offsets, successful):
+        values = [float(row[key]) for key, _ in metric_specs]
+        all_values.extend(values)
+        bars = metric_axis.bar(
+            x_positions + offset,
+            values,
+            width=width,
+            label=row["model"],
+            color=colors.get(row["model"], "#64748B"),
+            edgecolor="white",
+            linewidth=0.8,
+        )
+        if row["type"] == QUANTUM_TYPE:
+            for bar, value in zip(bars, values):
+                metric_axis.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    value + 0.004,
+                    f"{value:.3f}",
+                    ha="center",
+                    va="bottom",
+                    fontsize=8,
+                    fontweight="bold",
+                    color="#9F1239",
+                    rotation=90,
+                )
+
+    metric_axis.set_xticks(x_positions, [label for _, label in metric_specs])
+    metric_axis.set_ylim(max(0.0, min(all_values) - 0.08), min(1.03, max(all_values) + 0.04))
+    metric_axis.set_ylabel("Held-out score — higher is better")
+    metric_axis.set_title(
+        "Fair matched-data comparison\nSame training rows and held-out test set",
+        fontweight="bold",
+    )
+    metric_axis.grid(axis="y", alpha=0.22)
+    metric_axis.legend(loc="lower left", fontsize=9)
+
+    head_to_head = _quantum_kernel_vs_random_forest(successful)
+    if head_to_head:
+        difference_labels = ["Accuracy", "Sensitivity", "F1", "ROC-AUC"]
+        difference_values = [
+            100 * head_to_head["accuracy_difference"],
+            100 * head_to_head["sensitivity_difference"],
+            100 * head_to_head["f1_difference"],
+            100 * head_to_head["roc_auc_difference"],
+        ]
+        gain_colors = ["#94A3B8" if value == 0 else "#16A34A" for value in difference_values]
+        gain_bars = miss_axis.barh(difference_labels, difference_values, color=gain_colors)
+        miss_axis.invert_yaxis()
+        miss_axis.axvline(0, color="#475569", linewidth=1)
+        miss_axis.set_xlabel("Quantum Kernel gain over Random Forest (percentage points)")
+        miss_axis.set_title(
+            "Where the Quantum Kernel is better\nthan Random Forest",
+            fontweight="bold",
+        )
+        miss_axis.grid(axis="x", alpha=0.22)
+        miss_axis.set_xlim(min(-0.1, min(difference_values) - 0.2), max(difference_values) + 0.65)
+        for bar, value in zip(gain_bars, difference_values):
+            miss_axis.text(
+                value + 0.06,
+                bar.get_y() + bar.get_height() / 2,
+                "TIE" if value == 0 else f"+{value:.2f} pp",
+                va="center",
+                fontweight="bold",
+            )
+        miss_axis.text(
+            0.5,
+            -0.18,
+            f"Malignant cases missed: Quantum Kernel {head_to_head['quantum_false_negatives']} vs "
+            f"Random Forest {head_to_head['random_forest_false_negatives']} "
+            f"({head_to_head['fewer_malignant_cases_missed']} fewer)",
+            transform=miss_axis.transAxes,
+            ha="center",
+            fontsize=11,
+            fontweight="bold",
+            color="#166534",
+        )
+        comparison = (
+            "Quantum Kernel vs Random Forest: "
+            f"accuracy {head_to_head['accuracy_difference']:+.2%}; "
+            f"sensitivity {head_to_head['sensitivity_difference']:+.2%}; "
+            f"F1 {head_to_head['f1_difference']:+.2%}; "
+            f"ROC-AUC {head_to_head['roc_auc_difference']:+.2%}."
+        )
+        figure.text(0.5, 0.035, comparison, ha="center", fontsize=10, fontweight="bold")
+    else:
+        miss_axis.axis("off")
+        miss_axis.text(
+            0.5,
+            0.5,
+            "Quantum Kernel vs Random Forest comparison unavailable",
+            ha="center",
+            va="center",
+        )
+
+    figure.suptitle(
+        "Q-MedAI | Classical vs Quantum Evidence",
+        fontsize=19,
+        fontweight="bold",
+    )
+    figure.text(
+        0.5,
+        0.008,
+        "One benchmark split on PennyLane default.qubit; competitive result, not quantum advantage or clinical validation.",
+        ha="center",
+        fontsize=9,
+        color="#475569",
+    )
+    figure.tight_layout(rect=(0, 0.07, 1, 0.94))
+    path = PLOTS_DIR / filename
+    figure.savefig(path, dpi=180, bbox_inches="tight")
+    plt.close(figure)
+    return _artifact_plot_path(path)
+
+
 def _save_plots(full_records: list[dict[str, Any]], matched_records: list[dict[str, Any]]) -> list[str]:
     PLOTS_DIR.mkdir(parents=True, exist_ok=True)
     saved = [
@@ -303,6 +484,7 @@ def _save_plots(full_records: list[dict[str, Any]], matched_records: list[dict[s
         _save_metric_plot(full_records + matched_records, "accuracy", "accuracy_comparison.png"),
         _save_metric_plot(full_records + matched_records, "f1", "f1_comparison.png"),
         _save_metric_plot(full_records + matched_records, "roc_auc", "roc_auc_comparison.png"),
+        _save_judge_summary_plot(matched_records, "matched_classical_quantum_judge_summary.png"),
     ]
     return [path for path in saved if path is not None]
 
@@ -380,6 +562,8 @@ The exact same stratified 150 original training rows and unchanged held-out test
 
 {_markdown_table(matched['models'])}
 
+![Fair matched classical-vs-quantum comparison](results/plots/matched_classical_quantum_judge_summary.png)
+
 ## Observed performance difference
 
 Full-data reference: {_difference_text(analysis['full_data_quantum_kernel_vs_best_classical'])}
@@ -388,9 +572,13 @@ Matched-data fair comparison: {_difference_text(analysis['matched_quantum_kernel
 
 These are observed differences from one split, not quantum advantage. Statistical confidence intervals were not computed for this run; results reflect a single train/test split.
 
+The matched dashboard should be used to communicate the result, but visual polish is not a substitute for repeated-seed uncertainty estimates.
+
 ## Computational cost, interpretation, and limitations
 
 Quantum-kernel timing details are saved in `results/final_results.json`; VQC and kernel training times are shown above. This feasibility/prototype study on one supplied dataset is not evidence that quantum ML is generally superior or inferior for medical diagnosis. PennyLane `default.qubit` is a classical simulator, not physical quantum hardware. The study has one dataset, one split, limited qubit count, and no clinical validation.
+
+The most important next evidence is repeated-seed or nested cross-validation with paired confidence intervals and an external biomedical dataset. The current cross-sectional dataset evaluates malignant-class detection and cannot establish earlier-in-time diagnosis.
 
 ## Conclusion
 
@@ -422,6 +610,8 @@ The earlier **LOCAL BASELINE** used only 50 kernel-training rows while classical
 
 {_markdown_table(matched['models'])}
 
+![Fair matched classical-vs-quantum comparison](results/plots/matched_classical_quantum_judge_summary.png)
+
 ## What quantum contributed
 
 Full-data context: {_difference_text(full_difference)} The kernel used fewer training rows than full-data classical models, so this is contextual only.
@@ -431,6 +621,8 @@ Fair matched-data result: {_difference_text(matched_difference)} This is an obse
 ## Limitations and future work
 
 One supplied dataset and one train/test split are not clinical validation or general evidence. The quantum models run on a classical simulator and may be computationally slower. Future work: more datasets and splits, confidence intervals, larger carefully controlled circuits/kernels, appropriate GPU-accelerated simulation where supported, and eventual hardware studies.
+
+The most important next step is repeated-seed or nested cross-validation with paired confidence intervals, followed by external biomedical validation. Another graph cannot replace that evidence. Because the dataset is cross-sectional, this experiment does not prove earlier-in-time diagnosis.
 
 ## 30-second answer: Why quantum?
 
@@ -462,7 +654,10 @@ One supplied dataset and one train/test split are not clinical validation or gen
         "# Final results artifacts\n\n"
         "These files correspond to the FINAL EXPERIMENT executed during this Codex run. "
         "`final_results.json` is the authoritative structured result, `final_results.csv` is the table-friendly export, "
-        "`final_config.json` records the exact configuration, and `plots/` contains PNG figures generated from actual completed results.\n",
+        "`final_config.json` records the exact configuration, and `plots/` contains PNG figures generated from actual completed results.\n\n"
+        "For a college or SIH review, start with "
+        "[`matched_classical_quantum_judge_summary.png`](plots/matched_classical_quantum_judge_summary.png). "
+        "It presents the fair matched-data comparison without claiming quantum advantage or clinical validation.\n",
         encoding="utf-8",
     )
 

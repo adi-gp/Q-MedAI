@@ -31,15 +31,21 @@ The earlier **LOCAL BASELINE** used only 50 kernel-training rows while classical
 | Random Forest | Classical | COMPLETED | 0.9474 | 0.9737 | 0.8810 | 0.9861 | 0.9250 | 0.9907 | 0.085 |
 | Quantum Kernel SVM | Quantum | COMPLETED | 0.9474 | 0.9500 | 0.9048 | 0.9722 | 0.9268 | 0.9940 | 4.799 |
 
+![Fair matched classical-vs-quantum comparison](results/plots/matched_classical_quantum_judge_summary.png)
+
 ## What quantum contributed
 
 Full-data context: Quantum Kernel SVM minus Logistic Regression: ROC-AUC -0.0013; accuracy -0.0088; F1 -0.0129. The kernel used fewer training rows than full-data classical models, so this is contextual only.
 
 Fair matched-data result: Quantum Kernel SVM minus Logistic Regression: ROC-AUC -0.0020; accuracy -0.0088; F1 -0.0129. This is an observed performance difference, not quantum advantage.
 
+Compared specifically with Random Forest on the fair matched data, the Quantum Kernel tied accuracy and improved sensitivity by 0.0238, F1 by 0.0018, and ROC-AUC by 0.0033. RBF SVM remained strongest overall.
+
 ## Limitations and future work
 
 One supplied dataset and one train/test split are not clinical validation or general evidence. The quantum models run on a classical simulator and may be computationally slower. Future work: more datasets and splits, confidence intervals, larger carefully controlled circuits/kernels, appropriate GPU-accelerated simulation where supported, and eventual hardware studies.
+
+The most important next step is repeated-seed or nested cross-validation with paired confidence intervals, followed by external biomedical validation. Another graph cannot replace that evidence. Because the current dataset is cross-sectional, it supports malignant-class detection research but does not prove earlier-in-time diagnosis.
 
 ## 30-second answer: Why quantum?
 

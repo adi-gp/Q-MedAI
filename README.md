@@ -20,6 +20,24 @@ The final methodology uses:
 - 150-row stratified fidelity quantum-kernel SVM; and
 - a separate matched-data comparison where all four compared models use the exact same 150 raw training rows and separately fitted subset-only preprocessing.
 
+## Visual evidence
+
+The clearest judge-facing figure is the fair matched-data comparison below. All four displayed models use the same 150 training observations and the same 114 held-out test observations.
+
+![Q-MedAI fair classical-vs-quantum matched-data dashboard](results/plots/matched_classical_quantum_judge_summary.png)
+
+In the saved matched experiment, the Quantum Kernel tied Random Forest on accuracy and improved sensitivity by 2.38 percentage points, F1 by 0.18 percentage points, and ROC-AUC by 0.33 percentage points. RBF SVM remained the strongest overall model. This is a competitive and selectively stronger quantum result—not universal quantum advantage.
+
+Additional evidence:
+
+- [Matched-data ROC curves](results/plots/matched_data_roc_curves.png)
+- [Matched-data confusion matrices](results/plots/matched_data_confusion_matrices.png)
+- [Full-data ROC curves](results/plots/full_data_roc_curves.png)
+
+## Most important remaining evidence gap
+
+The main missing evidence is statistical robustness, not graphical polish. The saved experiment uses one dataset and one train/test split, without repeated-seed confidence intervals or external clinical validation. The dataset is cross-sectional, so the project evaluates malignant-class detection; it does not prove earlier-in-time diagnosis. A stronger next experiment would use repeated stratified splits or nested cross-validation, paired uncertainty estimates, and an external biomedical dataset.
+
 Quantum circuits use PennyLane `default.qubit`, a classical simulator—not a physical quantum computer. The final VQC has a cooperative 600-second limit; statuses and missing metrics are preserved exactly in the artifacts.
 
 ### LOCAL BASELINE

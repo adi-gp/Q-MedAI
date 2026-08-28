@@ -3534,6 +3534,7 @@
     "results/plots/matched_data_confusion_matrices.png",
     "results/plots/accuracy_comparison.png",
     "results/plots/f1_comparison.png",
-    "results/plots/roc_auc_comparison.png"
+    "results/plots/roc_auc_comparison.png",
+    "results/plots/matched_classical_quantum_judge_summary.png"
   ]
 }

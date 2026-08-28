@@ -37,6 +37,8 @@ The exact same stratified 150 original training rows and unchanged held-out test
 | Random Forest | Classical | COMPLETED | 0.9474 | 0.9737 | 0.8810 | 0.9861 | 0.9250 | 0.9907 | 0.085 |
 | Quantum Kernel SVM | Quantum | COMPLETED | 0.9474 | 0.9500 | 0.9048 | 0.9722 | 0.9268 | 0.9940 | 4.799 |
 
+![Fair matched classical-vs-quantum comparison](results/plots/matched_classical_quantum_judge_summary.png)
+
 ## Observed performance difference
 
 Full-data reference: Quantum Kernel SVM minus Logistic Regression: ROC-AUC -0.0013; accuracy -0.0088; F1 -0.0129.
@@ -45,9 +47,13 @@ Matched-data fair comparison: Quantum Kernel SVM minus Logistic Regression: ROC-
 
 These are observed differences from one split, not quantum advantage. Statistical confidence intervals were not computed for this run; results reflect a single train/test split.
 
+Compared specifically with Random Forest in the fair matched condition, the Quantum Kernel tied accuracy and improved sensitivity by 0.0238, F1 by 0.0018, and ROC-AUC by 0.0033. RBF SVM remained the strongest overall model.
+
 ## Computational cost, interpretation, and limitations
 
 Quantum-kernel timing details are saved in `results/final_results.json`; VQC and kernel training times are shown above. This feasibility/prototype study on one supplied dataset is not evidence that quantum ML is generally superior or inferior for medical diagnosis. PennyLane `default.qubit` is a classical simulator, not physical quantum hardware. The study has one dataset, one split, limited qubit count, and no clinical validation.
+
+The most important next evidence is repeated-seed or nested cross-validation with paired confidence intervals and an external biomedical dataset. The current cross-sectional dataset evaluates malignant-class detection and cannot establish earlier-in-time diagnosis.
 
 ## Conclusion
 
