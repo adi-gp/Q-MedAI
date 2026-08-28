@@ -11,6 +11,7 @@ import hashlib
 import json
 import platform
 import shutil
+import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -96,6 +97,23 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _canonical_json_bytes(value: Any) -> bytes:
+    return json.dumps(value, default=_json_default, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def _content_hashes(bundles: Mapping[str, Mapping[str, Any]], frozen_metrics: Mapping[str, Any]) -> dict[str, str]:
+    """Hash the version-free fitted content used to derive a stable model ID."""
+    with tempfile.TemporaryDirectory(prefix="qmedai-framingham-identity-") as temporary_directory:
+        root = Path(temporary_directory)
+        hashes: dict[str, str] = {}
+        for role, bundle in bundles.items():
+            path = root / f"{role}.joblib"
+            joblib.dump(dict(bundle), path)
+            hashes[role] = _sha256_file(path)
+    hashes["metrics"] = hashlib.sha256(_canonical_json_bytes(frozen_metrics)).hexdigest()
+    return hashes
+
+
 def _dataset_provenance(ns: Mapping[str, Any]) -> tuple[str | None, dict[str, Any]]:
     raw_path = ns.get("DATA_PATH")
     if raw_path is None:
@@ -139,24 +157,13 @@ def export_from_namespace(ns: Mapping[str, Any], output_dir: Path) -> Path:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     metrics = _jsonable_metrics(ns["summary"])
     dataset_sha256, dataset_provenance = _dataset_provenance(ns)
-    identity_payload = json.dumps({
-        "feature_order": feature_order,
-        "selected_indices": selected_indices,
-        "seed": int(ns["SEED"]),
-        "metrics": metrics,
-        "dataset_sha256": dataset_sha256,
-    }, sort_keys=True, separators=(",", ":"))
-    version_id = "qmedai-framingham-" + hashlib.sha256(identity_payload.encode()).hexdigest()[:12]
-
     classical_bundle = {
-        "model_version_id": version_id,
         "feature_order": list(feature_order),
         "model_name": primary_name,
         "preprocess": ns["preprocess"],
         "model": classical_models[primary_name],
     }
     quantum_bundle = {
-        "model_version_id": version_id,
         "feature_order": list(feature_order),
         "preprocess": ns["preprocess"],
         "selected_features": list(selected),
@@ -167,7 +174,6 @@ def export_from_namespace(ns: Mapping[str, Any], output_dir: Path) -> Path:
         "qsvc": ns["qsvc"],
     }
     hybrid_bundle = {
-        "model_version_id": version_id,
         "feature_order": list(feature_order),
         "preprocess": ns["preprocess"],
         "classical_base_model": ns["c_final"],
@@ -179,6 +185,25 @@ def export_from_namespace(ns: Mapping[str, Any], output_dir: Path) -> Path:
         "qsvc": ns["q_final"],
         "meta_model": ns["meta"],
     }
+    identity_metrics = {
+        "notebook_summary": metrics,
+        "dataset_provenance": dataset_provenance,
+    }
+    identity_hashes = _content_hashes(
+        {"classical": classical_bundle, "quantum": quantum_bundle, "hybrid": hybrid_bundle}, identity_metrics,
+    )
+    identity_inputs = {
+        "feature_order": feature_order,
+        "selected_indices": selected_indices,
+        "seed": int(ns["SEED"]),
+        "metrics": metrics,
+        "dataset_sha256": dataset_sha256,
+        "content_sha256": identity_hashes,
+    }
+    version_id = "qmedai-framingham-" + hashlib.sha256(_canonical_json_bytes(identity_inputs)).hexdigest()[:12]
+    classical_bundle["model_version_id"] = version_id
+    quantum_bundle["model_version_id"] = version_id
+    hybrid_bundle["model_version_id"] = version_id
     joblib.dump(classical_bundle, artifact_dir / _ARTIFACTS["classical"])
     joblib.dump(quantum_bundle, artifact_dir / _ARTIFACTS["quantum"])
     joblib.dump(hybrid_bundle, artifact_dir / _ARTIFACTS["hybrid"])
@@ -186,6 +211,7 @@ def export_from_namespace(ns: Mapping[str, Any], output_dir: Path) -> Path:
         "notebook_summary": metrics,
         "exported_model_version_id": version_id,
         "dataset_provenance": dataset_provenance,
+        "identity": {"algorithm": "sha256", "inputs": identity_inputs},
     }
     (artifact_dir / _ARTIFACTS["metrics"]).write_text(
         json.dumps(frozen_metrics, indent=2, sort_keys=True, default=_json_default), encoding="utf-8",

@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 import numpy as np
+import pandas as pd
 import pennylane as qml
 
 from src.demo.contracts import FraminghamArtifacts, InferenceResult, PatientValidationError
@@ -203,9 +204,10 @@ def _verified_bundle(
     return bundle
 
 
-def _transform(bundle: Mapping[str, Any], raw: np.ndarray, role: str) -> np.ndarray:
+def _transform(bundle: Mapping[str, Any], raw: np.ndarray, feature_order: list[str], role: str) -> np.ndarray:
     try:
-        transformed = np.asarray(bundle["preprocess"].transform(raw), dtype=float)
+        named_row = pd.DataFrame(raw, columns=feature_order)
+        transformed = np.asarray(bundle["preprocess"].transform(named_row), dtype=float)
     except (AttributeError, TypeError, ValueError) as exc:
         raise PatientValidationError(f"Verified {role} preprocessing could not transform the patient input: {exc}") from exc
     if transformed.shape != (1, len(_FIELD_NAMES)) or not np.all(np.isfinite(transformed)):
@@ -277,13 +279,13 @@ def predict_patient(artifacts: FraminghamArtifacts, values: Mapping[str, float])
     )
     raw = validate_patient(values, feature_order)
 
-    classical_x = _transform(classical, raw, "classical")
+    classical_x = _transform(classical, raw, feature_order, "classical")
     classical_score = _positive(classical["model"], classical_x)
 
-    quantum_x = _transform(quantum, raw, "quantum")
+    quantum_x = _transform(quantum, raw, feature_order, "quantum")
     quantum_score = _positive(quantum["qsvc"], _kernel(quantum, quantum_x, indices, n_qubits, "quantum"))
 
-    hybrid_x = _transform(hybrid, raw, "hybrid")
+    hybrid_x = _transform(hybrid, raw, feature_order, "hybrid")
     classical_base = _positive(hybrid["classical_base_model"], hybrid_x)
     quantum_base = _positive(hybrid["qsvc"], _kernel(hybrid, hybrid_x, indices, n_qubits, "hybrid"))
     hybrid_score = _positive(hybrid["meta_model"], np.asarray([[classical_base, quantum_base]], dtype=float))
