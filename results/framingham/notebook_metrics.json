@@ -4,7 +4,7 @@
   "title": "Prospective 10-year CHD risk research",
   "role": "PRIMARY_CLINICAL_WORKFLOW",
   "task_type": "PROSPECTIVE_BINARY_RISK",
-  "source": "framingham_with_artifact_export.ipynb; executed Kaggle input CHD_preprocessed.csv",
+  "source": "kaggle/Framingham_CHD_Executed_Evidence.ipynb",
   "cohort": {"rows": 4133, "train_rows": 3306, "test_rows": 827, "event_rate": 0.151948},
   "comparison_fairness": "UNMATCHED_RESOURCE_BUDGET",
   "backend": "PennyLane default.qubit (classical simulator)",

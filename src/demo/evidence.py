@@ -72,7 +72,12 @@ def load_breast_cancer_evidence(path: Path) -> TaskEvidence:
         if not isinstance(row, dict):
             raise EvidenceError("Breast-cancer metric row must be a JSON object.")
         try:
-            matrix = row.get("confusion_matrix") or [[0, 0], [0, 0]]
+            matrix = row["confusion_matrix"]
+            if (
+                not isinstance(matrix, list) or len(matrix) != 2
+                or any(not isinstance(line, list) or len(line) != 2 for line in matrix)
+            ):
+                raise EvidenceError("Invalid confusion_matrix; expected a 2x2 matrix.")
             metrics.append(MetricRecord(
                 model=row["model"], family=row["type"], accuracy=row["accuracy"],
                 precision=row["precision"], sensitivity=row["recall"],
@@ -80,16 +85,31 @@ def load_breast_cancer_evidence(path: Path) -> TaskEvidence:
                 false_negatives=int(matrix[1][0]),
                 training_seconds=row["training_time_seconds"],
             ))
-        except (KeyError, IndexError, TypeError, ValueError) as exc:
+        except KeyError as exc:
+            raise EvidenceError(f"Breast-cancer metric is missing: {exc.args[0]}") from exc
+        except (IndexError, TypeError, ValueError) as exc:
             raise EvidenceError("Invalid breast-cancer metric row.") from exc
+    try:
+        test_rows = comparison["test_rows"]
+        analysis = data["analysis"]
+        confidence = analysis["statistical_confidence"]
+        interpretation = analysis["interpretation"]
+    except KeyError as exc:
+        raise EvidenceError(f"Breast-cancer evidence is missing: {exc.args[0]}") from exc
+    except (TypeError, ValueError) as exc:
+        raise EvidenceError("Breast-cancer evidence has invalid nested fields.") from exc
+    if not isinstance(test_rows, int):
+        raise EvidenceError("Breast-cancer evidence requires matched_data_comparison.test_rows.")
+    if not isinstance(analysis, dict):
+        raise EvidenceError("Breast-cancer evidence requires analysis.")
     return TaskEvidence(
         task_id="breast_cancer_wdbc", title="Breast cancer diagnostic classification",
         role="QUANTUM_EVIDENCE_BENCHMARK", task_type="CROSS_SECTIONAL_CLASSIFICATION",
-        source=str(path), cohort={"train_rows": 150, "test_rows": comparison["test_rows"]},
+        source=str(path), cohort={"train_rows": 150, "test_rows": test_rows},
         comparison_fairness="MATCHED_150_ROWS",
         backend="PennyLane default.qubit (classical simulator)", metrics=tuple(metrics),
         focus_reference_model="Random Forest", focus_candidate_model="Quantum Kernel SVM",
         prioritized_metric="sensitivity", uncertainty_status="NOT_COMPUTED",
         calibration_status="NOT_APPLICABLE",
-        limitations=(data["analysis"]["statistical_confidence"], data["analysis"]["interpretation"]),
+        limitations=(confidence, interpretation),
     )
