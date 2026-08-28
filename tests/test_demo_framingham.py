@@ -175,6 +175,59 @@ def test_prediction_rejects_malformed_embedded_metadata_types_before_any_score(r
         predict_patient(artifacts, _values())
 
 
+_BAD_STRING_METADATA = (np.array(["bad", "metadata"]), ["bad"], None, 42)
+
+
+def _prevent_scoring(artifacts):
+    artifacts.classical["model"] = NeverScore()
+    artifacts.quantum["qsvc"] = NeverScore()
+    artifacts.hybrid["classical_base_model"] = NeverScore()
+    artifacts.hybrid["qsvc"] = NeverScore()
+    artifacts.hybrid["meta_model"] = NeverScore()
+
+
+@pytest.mark.parametrize("value", _BAD_STRING_METADATA)
+def test_prediction_rejects_malformed_manifest_feature_map_version_before_any_score(value):
+    artifacts = _artifacts()
+    artifacts.manifest["quantum"]["feature_map"]["version"] = value
+    _prevent_scoring(artifacts)
+
+    with pytest.raises(PatientValidationError, match="feature-map"):
+        predict_patient(artifacts, _values())
+
+
+@pytest.mark.parametrize("value", _BAD_STRING_METADATA)
+def test_prediction_rejects_malformed_manifest_model_version_before_any_score(value):
+    artifacts = _artifacts()
+    artifacts.manifest["model_version_id"] = value
+    _prevent_scoring(artifacts)
+
+    with pytest.raises(PatientValidationError, match="model_version_id"):
+        predict_patient(artifacts, _values())
+
+
+@pytest.mark.parametrize("role", ("classical", "quantum", "hybrid"))
+@pytest.mark.parametrize("value", _BAD_STRING_METADATA)
+def test_prediction_rejects_malformed_bundle_model_version_before_any_score(role, value):
+    artifacts = _artifacts()
+    getattr(artifacts, role)["model_version_id"] = value
+    _prevent_scoring(artifacts)
+
+    with pytest.raises(PatientValidationError, match="model_version_id"):
+        predict_patient(artifacts, _values())
+
+
+@pytest.mark.parametrize("role", ("quantum", "hybrid"))
+@pytest.mark.parametrize("value", _BAD_STRING_METADATA)
+def test_prediction_rejects_malformed_bundle_feature_map_version_before_any_score(role, value):
+    artifacts = _artifacts()
+    getattr(artifacts, role)["feature_map_version"] = value
+    _prevent_scoring(artifacts)
+
+    with pytest.raises(PatientValidationError, match="feature_map_version"):
+        predict_patient(artifacts, _values())
+
+
 @pytest.mark.parametrize("coefficients", [["not-a-number"], np.ones(14), np.ones((1, 1, 15))])
 def test_prediction_translates_corrupt_contribution_coefficients_to_domain_error(coefficients):
     artifacts = _artifacts()

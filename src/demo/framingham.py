@@ -74,6 +74,10 @@ def _is_selected_indices(value: Any) -> bool:
     )
 
 
+def _is_exact_string(value: Any, expected: str) -> bool:
+    return type(value) is str and value == expected
+
+
 def validate_patient(values: Mapping[str, float], feature_order: list[str]) -> np.ndarray:
     """Return one strictly contract-ordered patient row without persisting it."""
     if list(feature_order) != list(_FIELD_NAMES):
@@ -149,12 +153,16 @@ def _mapping(value: Any, label: str) -> Mapping[str, Any]:
 
 def _manifest_contract(artifacts: FraminghamArtifacts) -> tuple[list[str], list[int], int, str]:
     manifest = _mapping(artifacts.manifest, "manifest")
+    manifest_version = manifest.get("model_version_id")
     feature_order = manifest.get("feature_order")
     quantum = _mapping(manifest.get("quantum"), "manifest quantum")
     feature_map = _mapping(quantum.get("feature_map"), "manifest feature-map")
+    feature_map_version = feature_map.get("version")
     indices = quantum.get("selected_indices")
     n_qubits = quantum.get("n_qubits")
-    if feature_map.get("version") != FEATURE_MAP_VERSION:
+    if type(manifest_version) is not str:
+        raise PatientValidationError("Artifact model_version_id must be an exact built-in string.")
+    if not _is_exact_string(feature_map_version, FEATURE_MAP_VERSION):
         raise PatientValidationError("Artifact feature-map version is not the verified Framingham notebook feature map.")
     if not _is_feature_order(feature_order, list(_FIELD_NAMES)):
         raise PatientValidationError("Artifact feature order does not match the exact 15-field Framingham contract.")
@@ -162,7 +170,7 @@ def _manifest_contract(artifacts: FraminghamArtifacts) -> tuple[list[str], list[
         raise PatientValidationError("Artifact quantum selected feature indices are invalid for the Framingham contract.")
     if type(n_qubits) is not int or n_qubits != len(indices):
         raise PatientValidationError("Artifact n_qubits must exactly match the selected quantum feature count.")
-    return list(feature_order), list(indices), n_qubits, FEATURE_MAP_VERSION
+    return list(feature_order), list(indices), n_qubits, feature_map_version
 
 
 def _verified_bundle(
@@ -179,7 +187,7 @@ def _verified_bundle(
     if missing:
         raise PatientValidationError(f"Verified {role} bundle is missing required interface(s): {', '.join(missing)}.")
     manifest_version = artifacts.manifest.get("model_version_id")
-    if not isinstance(manifest_version, str) or bundle.get("model_version_id") != manifest_version:
+    if type(manifest_version) is not str or not _is_exact_string(bundle.get("model_version_id"), manifest_version):
         raise PatientValidationError(f"Verified {role} bundle model_version_id does not match the manifest.")
     bundle_feature_order = bundle.get("feature_order")
     if not _is_feature_order(bundle_feature_order, feature_order):
@@ -190,7 +198,7 @@ def _verified_bundle(
             raise PatientValidationError(f"Verified {role} bundle selected_indices do not match the manifest.")
         if type(bundle.get("n_qubits")) is not int or bundle["n_qubits"] != n_qubits:
             raise PatientValidationError(f"Verified {role} bundle n_qubits does not match the manifest.")
-        if type(bundle.get("feature_map_version")) is not str or bundle["feature_map_version"] != feature_map_version:
+        if not _is_exact_string(bundle.get("feature_map_version"), feature_map_version):
             raise PatientValidationError(f"Verified {role} bundle feature_map_version does not match the manifest.")
     return bundle
 
