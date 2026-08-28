@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "task_id": "framingham_chd_10y",
+  "title": "Prospective 10-year CHD risk research",
+  "role": "PRIMARY_CLINICAL_WORKFLOW",
+  "task_type": "PROSPECTIVE_BINARY_RISK",
+  "source": "framingham_with_artifact_export.ipynb; executed Kaggle input CHD_preprocessed.csv",
+  "cohort": {"rows": 4133, "train_rows": 3306, "test_rows": 827, "event_rate": 0.151948},
+  "comparison_fairness": "UNMATCHED_RESOURCE_BUDGET",
+  "backend": "PennyLane default.qubit (classical simulator)",
+  "focus_reference_model": "Logistic Regression",
+  "focus_candidate_model": "Hybrid CML + QML",
+  "prioritized_metric": "roc_auc",
+  "uncertainty_status": "PER_MODEL_BOOTSTRAP_ONLY",
+  "calibration_status": "NOT_DEMONSTRATED",
+  "metrics": [
+    {"model": "Logistic Regression", "family": "Classical", "accuracy": 0.6989, "precision": 0.2811, "sensitivity": 0.6270, "specificity": 0.7118, "f1": 0.3882, "roc_auc": 0.7345, "auprc": 0.3603, "training_seconds": 0.0278},
+    {"model": "Hybrid CML + QML", "family": "Hybrid", "accuracy": 0.7207, "precision": 0.2667, "sensitivity": 0.4762, "specificity": 0.7646, "f1": 0.3419, "roc_auc": 0.7062, "auprc": 0.2727, "training_seconds": 12.3486},
+    {"model": "Random Forest", "family": "Classical", "accuracy": 0.8380, "precision": 0.4167, "sensitivity": 0.1587, "specificity": 0.9601, "f1": 0.2299, "roc_auc": 0.7016, "auprc": 0.3362, "training_seconds": 1.4572},
+    {"model": "RBF-SVM", "family": "Classical", "accuracy": 0.8476, "precision": 0.0, "sensitivity": 0.0, "specificity": 1.0, "f1": 0.0, "roc_auc": 0.6886, "auprc": 0.2581, "training_seconds": 2.6535},
+    {"model": "HistGradientBoosting", "family": "Classical", "accuracy": 0.8452, "precision": 0.4667, "sensitivity": 0.1111, "specificity": 0.9772, "f1": 0.1795, "roc_auc": 0.6775, "auprc": 0.2903, "training_seconds": 0.4299},
+    {"model": "Quantum Kernel SVM", "family": "Quantum", "accuracy": 0.8452, "precision": 0.25, "sensitivity": 0.0079, "specificity": 0.9957, "f1": 0.0154, "roc_auc": 0.6581, "auprc": 0.2535, "training_seconds": 4.4046}
+  ],
+  "limitations": [
+    "Quantum and hybrid models use 500 training rows and four features while full-data classical models use 3306 rows and 15 features.",
+    "Mutual-information feature selection was learned before the stacking folds.",
+    "The source is a public preprocessed CSV whose original cohort provenance was not independently verified.",
+    "Quantum execution used a classical simulator.",
+    "No external clinical validation or demonstrated probability calibration is available."
+  ]
+}
