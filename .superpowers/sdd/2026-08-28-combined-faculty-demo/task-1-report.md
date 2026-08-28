@@ -69,3 +69,38 @@ Before the loader fixes, the new behavior tests also failed as expected: 3 faile
 ### Fix-round self-review
 
 Verified the copied notebook is present in the delivered tree, the Framingham source assertion resolves successfully, malformed and missing nested schemas produce `EvidenceError`, and no existing breast-cancer result artifact was changed. `git diff --check` is clean. The full suite retains one pre-existing sklearn deprecation warning.
+
+## Fix round 2 review response
+
+Restored the Framingham `source` field exactly to the brief’s historical source string and added `cohort.source_artifact` pointing to the copied repository notebook. The provenance existence test now resolves that artifact field while preserving the required source value.
+
+### Replayable RED commit
+
+Intermediate test-only commit: `25d01648f66ef982bf1d135a1407a6053c1a686f` (`test: capture task 1 missing-package red state`). It retains the evidence JSON, copied notebook, and tests while removing `src/demo`. From that commit, the exact command:
+
+```text
+/Users/mymac/Desktop/Q-MedAI/.venv/bin/python -m pytest tests/test_demo_evidence.py -q
+```
+
+produced collection failure:
+
+```text
+ModuleNotFoundError: No module named 'src.demo.evidence'
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+```
+
+The production package was then restored in the subsequent GREEN commit, without rewriting prior history.
+
+### Fix-round 2 GREEN evidence
+
+```text
+/Users/mymac/Desktop/Q-MedAI/.venv/bin/python -m pytest tests/test_demo_evidence.py -q
+......                                                                   [100%]
+6 passed in 0.04s
+
+/Users/mymac/Desktop/Q-MedAI/.venv/bin/python -m pytest -q
+......................                                                   [100%]
+22 passed, 1 warning in 4.60s
+```
+
+The remaining warning is the pre-existing sklearn `probability` deprecation warning.
