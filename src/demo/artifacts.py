@@ -101,10 +101,11 @@ def _validate_manifest(data: Any) -> dict[str, Any]:
     _require_string(manifest["backend"], "backend")
 
     artifacts = _require_mapping(manifest["artifacts"], "artifacts")
-    if set(artifacts) != set(ARTIFACT_FILENAMES) or not all(
-        isinstance(name, str) and name for name in artifacts.values()
-    ):
-        raise ArtifactError("Manifest field 'artifacts' must map each canonical role to a filename.")
+    if dict(artifacts) != ARTIFACT_FILENAMES:
+        raise ArtifactError(
+            "Manifest artifact filenames must stay inside the trusted artifact directory "
+            "and equal the canonical role-to-filename mapping."
+        )
     checksums = _require_mapping(manifest["checksums_sha256"], "checksums_sha256")
     if set(checksums) != set(ARTIFACT_FILENAMES.values()) or not all(
         isinstance(digest, str) and SHA256_HEX.fullmatch(digest) for digest in checksums.values()
@@ -116,7 +117,7 @@ def _validate_manifest(data: Any) -> dict[str, Any]:
 def _manifest(directory: Path) -> dict[str, Any]:
     try:
         data = json.loads((directory / "model_manifest.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ArtifactError(f"Cannot read model manifest: {exc}") from exc
     return _validate_manifest(data)
 

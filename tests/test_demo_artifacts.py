@@ -86,6 +86,34 @@ def test_declared_incompatible_sklearn_version_is_rejected(tmp_path):
         load_framingham_artifacts(directory)
 
 
+def test_non_utf8_manifest_returns_invalid_status_and_load_error(tmp_path):
+    directory = _artifact_dir(tmp_path)
+    (directory / "model_manifest.json").write_bytes(b"\xff\xfe")
+
+    status = inspect_framingham_artifacts(directory)
+
+    assert status.ready is False
+    assert status.code == "ARTIFACTS_INVALID"
+    with pytest.raises(ArtifactError, match="Cannot read model manifest"):
+        load_framingham_artifacts(directory)
+
+
+def test_swapped_artifact_roles_are_rejected_before_joblib_load(tmp_path, monkeypatch):
+    directory = _artifact_dir(tmp_path)
+    manifest = _manifest(directory)
+    manifest["artifacts"]["classical"] = "hybrid_bundle.joblib"
+    manifest["artifacts"]["hybrid"] = "classical_pipeline.joblib"
+    _write_manifest(directory, manifest)
+    monkeypatch.setattr(joblib, "load", lambda _: pytest.fail("joblib.load must not run"))
+
+    status = inspect_framingham_artifacts(directory)
+
+    assert status.ready is False
+    assert status.code == "ARTIFACTS_INVALID"
+    with pytest.raises(ArtifactError, match="canonical role-to-filename mapping"):
+        load_framingham_artifacts(directory)
+
+
 @pytest.mark.parametrize(
     ("path", "value"),
     [
