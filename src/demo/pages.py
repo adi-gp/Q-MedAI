@@ -32,6 +32,7 @@ PAGES = (
 )
 QUANTUM_FEATURES = ("age", "sysBP", "prevalentHyp", "diaBP")
 FEATURE_MAP_SEQUENCE = "H → RY(x) → RZ(0.5x) → ring-CZ → RY(x²/π)"
+FEATURED_BREAST_PLOT = Path("results/plots/matched_classical_quantum_judge_summary.png")
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,7 @@ class DemoContext:
     framingham_verdict: UtilityVerdict
     breast_cancer_verdict: UtilityVerdict
     artifact_status: ArtifactStatus
+    artifact_directory: Path | None = None
 
 
 def _metric_frame(evidence: TaskEvidence) -> pd.DataFrame:
@@ -75,6 +77,43 @@ def _verdict_card(label: str, verdict: UtilityVerdict) -> None:
 def _download(path: Path, label: str, mime: str) -> None:
     if path.is_file():
         st.download_button(label, path.read_bytes(), file_name=path.name, mime=mime)
+
+
+def _breast_plot_paths(project_root: Path) -> tuple[Path, ...]:
+    """Return unique authoritative plot paths with the judge summary first."""
+    evidence_path = project_root / "results/final_results.json"
+    try:
+        payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+        listed = payload["plots"]
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError) as exc:
+        st.warning(f"Authoritative Breast Cancer plot inventory is unavailable: {exc}")
+        return ()
+    if not isinstance(listed, list) or not all(isinstance(item, str) for item in listed):
+        st.warning("Authoritative Breast Cancer plot inventory must be a list of paths.")
+        return ()
+
+    relative_paths = [Path(item) for item in listed]
+    ordered = [FEATURED_BREAST_PLOT, *(path for path in relative_paths if path != FEATURED_BREAST_PLOT)]
+    unique: list[Path] = []
+    for path in ordered:
+        if path in relative_paths and path not in unique:
+            unique.append(path)
+    return tuple(unique)
+
+
+def _render_breast_plot(project_root: Path, relative_path: Path) -> None:
+    path = project_root / relative_path
+    if not path.is_file():
+        st.warning(f"Authoritative Breast Cancer plot is listed but unavailable: {relative_path.as_posix()}")
+        return
+    st.image(str(path), caption=path.name, width="stretch")
+    st.download_button(
+        f"Download {path.name}",
+        path.read_bytes(),
+        file_name=path.name,
+        mime="image/png",
+        key=f"breast_plot_{relative_path.as_posix()}",
+    )
 
 
 def _signature(config: ExperimentConfig, selected_models: set[str]) -> str:
@@ -164,7 +203,8 @@ def render_patient_risk(context: DemoContext) -> None:
         return
     if submitted:
         try:
-            artifacts = load_framingham_artifacts(context.project_root / "artifacts/framingham")
+            artifact_directory = context.artifact_directory or context.project_root / "artifacts/framingham"
+            artifacts = load_framingham_artifacts(artifact_directory)
             result = predict_patient(artifacts, values)
         except (ArtifactError, PatientValidationError) as exc:
             st.error(f"Verified inference stopped safely: {exc}")
@@ -227,9 +267,10 @@ def render_breast_cancer_evidence(context: DemoContext) -> None:
     st.subheader("Breast Cancer · quantum evidence benchmark")
     st.caption("Separate cross-sectional diagnostic-classification benchmark; not a Framingham patient calculator.")
     _verdict_card("Matched 150-row verdict", context.breast_cancer_verdict)
-    figure = context.project_root / "results/plots/matched_classical_quantum_judge_summary.png"
-    if figure.is_file():
-        st.image(str(figure), caption="Matched classical–quantum judge summary", width="stretch")
+    plot_paths = _breast_plot_paths(context.project_root)
+    if plot_paths:
+        st.markdown("#### Featured matched judge figure")
+        _render_breast_plot(context.project_root, plot_paths[0])
     st.dataframe(_metric_frame(context.breast_cancer), hide_index=True, width="stretch")
     deltas = context.breast_cancer_verdict.deltas
     first, second, third = st.columns(3)
@@ -240,17 +281,21 @@ def render_breast_cancer_evidence(context: DemoContext) -> None:
         "The Quantum Kernel shows a selective sensitivity benefit and one fewer false negative versus Random "
         "Forest on this matched split. RBF SVM remains the strongest overall model by the declared ranking rule."
     )
+    st.markdown("#### Authoritative evidence downloads")
     download_columns = st.columns(4)
     downloads = (
-        ("final_results.csv", "Download matched CSV", "text/csv"),
-        ("final_results.json", "Download evidence JSON", "application/json"),
-        ("final_config.json", "Download configuration", "application/json"),
+        (context.project_root / "results/final_results.csv", "Download matched CSV", "text/csv"),
+        (context.project_root / "results/final_results.json", "Download evidence JSON", "application/json"),
+        (context.project_root / "results/final_config.json", "Download configuration", "application/json"),
+        (context.project_root / "SIH_FINAL_SUMMARY.md", "Download SIH final summary", "text/markdown"),
     )
-    for column, (name, label, mime) in zip(download_columns, downloads):
+    for column, (path, label, mime) in zip(download_columns, downloads):
         with column:
-            _download(context.project_root / "results" / name, label, mime)
-    with download_columns[-1]:
-        _download(figure, "Download judge figure", "image/png")
+            _download(path, label, mime)
+    if len(plot_paths) > 1:
+        st.markdown("#### Additional authoritative result figures")
+        for plot_path in plot_paths[1:]:
+            _render_breast_plot(context.project_root, plot_path)
     for limitation in context.breast_cancer.limitations:
         st.caption(limitation)
 
@@ -359,10 +404,16 @@ def _run_new_experiment() -> None:
     render_research_runner()
 
 
-def render_app(project_root: Path) -> None:
+def render_app(project_root: Path, artifact_directory: Path | None = None) -> None:
+    """Render the faculty app using a local trusted artifact directory.
+
+    ``artifact_directory`` supports controlled deployments and isolated tests;
+    no UI accepts arbitrary artifact uploads.
+    """
     framingham = load_framingham_evidence(project_root / "results/framingham/notebook_metrics.json")
     breast = load_breast_cancer_evidence(project_root / "results/final_results.json")
-    status = inspect_framingham_artifacts(project_root / "artifacts/framingham")
+    resolved_artifact_directory = artifact_directory or project_root / "artifacts/framingham"
+    status = inspect_framingham_artifacts(resolved_artifact_directory)
     context = DemoContext(
         project_root=project_root,
         framingham=framingham,
@@ -370,6 +421,7 @@ def render_app(project_root: Path) -> None:
         framingham_verdict=evaluate_utility(framingham),
         breast_cancer_verdict=evaluate_utility(breast),
         artifact_status=status,
+        artifact_directory=resolved_artifact_directory,
     )
 
     st.markdown(THEME_CSS, unsafe_allow_html=True)
