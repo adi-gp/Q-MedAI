@@ -142,3 +142,27 @@ def test_exported_named_dataframe_preprocessors_round_trip_without_feature_name_
     assert 0.0 <= result.classical_score <= 1.0
     assert 0.0 <= result.quantum_score <= 1.0
     assert 0.0 <= result.hybrid_score <= 1.0
+
+
+@pytest.mark.filterwarnings(
+    "ignore:The `probability` parameter was deprecated in 1\\.9 and will be removed in version 1\\.11.*:FutureWarning:sklearn\\.svm\\._base",
+)
+@pytest.mark.filterwarnings(
+    "ignore:Setting the shape on a NumPy array has been deprecated in NumPy 2\\.5\\..*:DeprecationWarning:joblib\\.numpy_pickle",
+)
+def test_exporter_accepts_public_dataset_provenance_without_private_path(tmp_path):
+    namespace = _notebook_namespace()
+    namespace["DATA_PATH"] = "/private/user/downloads/CHD_preprocessed.csv"
+    namespace["DATASET_PROVENANCE"] = {
+        "kaggle_slug": "captainozlem/framingham-chd-preprocessed-data",
+        "file": "CHD_preprocessed.csv",
+        "dataset_sha256": "a" * 64,
+    }
+
+    artifact_dir = export_from_namespace(namespace, tmp_path)
+    manifest = json.loads((artifact_dir / "model_manifest.json").read_text(encoding="utf-8"))
+    metrics = json.loads((artifact_dir / "frozen_notebook_metrics.json").read_text(encoding="utf-8"))
+
+    assert manifest["dataset_provenance"] == namespace["DATASET_PROVENANCE"]
+    assert metrics["dataset_provenance"] == namespace["DATASET_PROVENANCE"]
+    assert "/private/user" not in json.dumps(manifest)

@@ -1,0 +1,245 @@
+{
+  "artifacts": {
+    "classical": "classical_pipeline.joblib",
+    "hybrid": "hybrid_bundle.joblib",
+    "metrics": "frozen_notebook_metrics.json",
+    "quantum": "quantum_bundle.joblib"
+  },
+  "backend": "PennyLane default.qubit (classical quantum-circuit simulator)",
+  "calibration": {
+    "status": "NOT_DEMONSTRATED"
+  },
+  "checksums_sha256": {
+    "classical_pipeline.joblib": "6a46b714bf4b0770cb784f701e4c3c9c547c0dc1e206656ff36447f5a3f2c2de",
+    "frozen_notebook_metrics.json": "88077f256687219795695d340dc393560bf0203a47cddf7ce6f6a917771eed9b",
+    "hybrid_bundle.joblib": "0e6aa2397fda96a9f6ce48f5ee899ea74dcb24b314a5894b60aada2d707b3366",
+    "quantum_bundle.joblib": "2548f93116890c3ca8a448949296239cb7d2559075ed5df0d0baf993de00e845"
+  },
+  "dataset": "Framingham Heart Study-compatible cohort loaded by the notebook",
+  "dataset_provenance": {
+    "dataset_sha256": "d54defaf08bac7c6d05cdebde17f220dcfd970f5b956db4a13092f4fcdeef151",
+    "file": "CHD_preprocessed.csv",
+    "kaggle_slug": "captainozlem/framingham-chd-preprocessed-data"
+  },
+  "evaluation_metrics": [
+    {
+      "AUPRC": 0.3603,
+      "AUROC": 0.7345,
+      "Accuracy": 0.6989,
+      "F1": 0.3882,
+      "Model": "Logistic Regression",
+      "Precision": 0.2811,
+      "Sensitivity": 0.627,
+      "Specificity": 0.7118,
+      "Time_s": 0.0278
+    },
+    {
+      "AUPRC": 0.2727,
+      "AUROC": 0.7062,
+      "Accuracy": 0.7207,
+      "F1": 0.3419,
+      "Model": "Hybrid CML + QML",
+      "Precision": 0.2667,
+      "Sensitivity": 0.4762,
+      "Specificity": 0.7646,
+      "Time_s": 12.3486
+    },
+    {
+      "AUPRC": 0.3362,
+      "AUROC": 0.7016,
+      "Accuracy": 0.838,
+      "F1": 0.2299,
+      "Model": "Random Forest",
+      "Precision": 0.4167,
+      "Sensitivity": 0.1587,
+      "Specificity": 0.9601,
+      "Time_s": 1.4572
+    },
+    {
+      "AUPRC": 0.2581,
+      "AUROC": 0.6886,
+      "Accuracy": 0.8476,
+      "F1": 0.0,
+      "Model": "RBF-SVM",
+      "Precision": 0.0,
+      "Sensitivity": 0.0,
+      "Specificity": 1.0,
+      "Time_s": 2.6535
+    },
+    {
+      "AUPRC": 0.2903,
+      "AUROC": 0.6775,
+      "Accuracy": 0.8452,
+      "F1": 0.1795,
+      "Model": "HistGradientBoosting",
+      "Precision": 0.4667,
+      "Sensitivity": 0.1111,
+      "Specificity": 0.9772,
+      "Time_s": 0.4299
+    },
+    {
+      "AUPRC": 0.2535,
+      "AUROC": 0.6581,
+      "Accuracy": 0.8452,
+      "F1": 0.0154,
+      "Model": "Quantum Kernel SVM",
+      "Precision": 0.25,
+      "Sensitivity": 0.0079,
+      "Specificity": 0.9957,
+      "Time_s": 4.4046
+    }
+  ],
+  "feature_order": [
+    "sex_male",
+    "age",
+    "education",
+    "currentSmoker",
+    "cigsPerDay",
+    "BPMeds",
+    "prevalentStroke",
+    "prevalentHyp",
+    "diabetes",
+    "totChol",
+    "sysBP",
+    "diaBP",
+    "BMI",
+    "heartRate",
+    "glucose"
+  ],
+  "input_schema": {
+    "BMI": {
+      "binary": false,
+      "maximum": 60,
+      "minimum": 12
+    },
+    "BPMeds": {
+      "binary": true,
+      "maximum": 1,
+      "minimum": 0
+    },
+    "age": {
+      "binary": false,
+      "maximum": 75,
+      "minimum": 32
+    },
+    "cigsPerDay": {
+      "binary": false,
+      "maximum": 70,
+      "minimum": 0
+    },
+    "currentSmoker": {
+      "binary": true,
+      "maximum": 1,
+      "minimum": 0
+    },
+    "diaBP": {
+      "binary": false,
+      "maximum": 150,
+      "minimum": 40
+    },
+    "diabetes": {
+      "binary": true,
+      "maximum": 1,
+      "minimum": 0
+    },
+    "education": {
+      "binary": true,
+      "maximum": 1,
+      "minimum": 0
+    },
+    "glucose": {
+      "binary": false,
+      "maximum": 400,
+      "minimum": 40
+    },
+    "heartRate": {
+      "binary": false,
+      "maximum": 220,
+      "minimum": 35
+    },
+    "prevalentHyp": {
+      "binary": true,
+      "maximum": 1,
+      "minimum": 0
+    },
+    "prevalentStroke": {
+      "binary": true,
+      "maximum": 1,
+      "minimum": 0
+    },
+    "sex_male": {
+      "binary": true,
+      "maximum": 1,
+      "minimum": 0
+    },
+    "sysBP": {
+      "binary": false,
+      "maximum": 250,
+      "minimum": 80
+    },
+    "totChol": {
+      "binary": false,
+      "maximum": 600,
+      "minimum": 100
+    }
+  },
+  "model_version_id": "qmedai-framingham-b98c306b5b44",
+  "notebook_provenance": {
+    "builder": "scripts.build_framingham_artifacts",
+    "evidence_notebook": "kaggle/Framingham_CHD_Executed_Evidence.ipynb",
+    "exporter": "kaggle.framingham_artifact_export",
+    "source": "local deterministic reproduction of the executed notebook procedure"
+  },
+  "project": "Q-MedAI",
+  "provenance_notes": [
+    "Artifacts are serialized from already-fitted notebook objects; the exporter does not retrain models.",
+    "Primary patient-facing prediction is the frozen Logistic Regression probability.",
+    "Quantum and hybrid outputs are research comparisons and are not promoted as validated clinical estimates."
+  ],
+  "quantum": {
+    "feature_map": {
+      "angle_scale": "pi/3",
+      "clip": [
+        -3.0,
+        3.0
+      ],
+      "gates": [
+        "H",
+        "RY(x)",
+        "RZ(0.5*x)",
+        "ring-CZ",
+        "RY(x^2/pi)"
+      ],
+      "kernel": "abs(inner_product(patient_state, training_state))**2",
+      "version": "framingham_v1_h_rz_cz_reupload"
+    },
+    "n_qubits": 4,
+    "selected_features": [
+      "age",
+      "sysBP",
+      "prevalentHyp",
+      "diaBP"
+    ],
+    "selected_indices": [
+      1,
+      10,
+      7,
+      11
+    ],
+    "training_reference_rows": 500
+  },
+  "schema_version": 1,
+  "split": {
+    "seed": 42,
+    "test_size": 0.20009678199854827
+  },
+  "target": "TenYearCHD",
+  "task": "Prospective 10-year coronary heart disease risk prediction from baseline clinical measurements",
+  "versions": {
+    "numpy": "2.5.2",
+    "pandas": "3.0.5",
+    "pennylane": "0.45.1",
+    "python": "3.12.12",
+    "scikit-learn": "1.9.0"
+  }
+}

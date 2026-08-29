@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import platform
+import re
 import shutil
 import tempfile
 from collections.abc import Mapping
@@ -115,6 +116,19 @@ def _content_hashes(bundles: Mapping[str, Mapping[str, Any]], frozen_metrics: Ma
 
 
 def _dataset_provenance(ns: Mapping[str, Any]) -> tuple[str | None, dict[str, Any]]:
+    supplied = ns.get("DATASET_PROVENANCE")
+    if supplied is not None:
+        if not isinstance(supplied, Mapping):
+            raise ValueError("DATASET_PROVENANCE must be a mapping when supplied.")
+        provenance = dict(supplied)
+        required = {"kaggle_slug", "file", "dataset_sha256"}
+        if set(provenance) != required:
+            raise ValueError("DATASET_PROVENANCE must contain only kaggle_slug, file, and dataset_sha256.")
+        if not all(isinstance(provenance[name], str) and provenance[name] for name in required):
+            raise ValueError("DATASET_PROVENANCE values must be non-empty strings.")
+        if not re.fullmatch(r"[0-9a-f]{64}", provenance["dataset_sha256"]):
+            raise ValueError("DATASET_PROVENANCE dataset_sha256 must be a lowercase SHA-256 digest.")
+        return provenance["dataset_sha256"], provenance
     raw_path = ns.get("DATA_PATH")
     if raw_path is None:
         return None, {"data_path": None, "dataset_sha256": None}
@@ -223,7 +237,9 @@ def export_from_namespace(ns: Mapping[str, Any], output_dir: Path) -> Path:
         "project": "Q-MedAI",
         "dataset": "Framingham Heart Study-compatible cohort loaded by the notebook",
         "dataset_provenance": dataset_provenance,
-        "notebook_provenance": {"source": "already-fitted Kaggle notebook namespace", "exporter": __name__},
+        "notebook_provenance": dict(ns.get("NOTEBOOK_PROVENANCE", {
+            "source": "already-fitted Kaggle notebook namespace", "exporter": __name__,
+        })),
         "task": "Prospective 10-year coronary heart disease risk prediction from baseline clinical measurements",
         "target": str(ns["TARGET"]),
         "split": {"seed": int(ns["SEED"]), "test_size": float(len(ns["X_test"]) / (len(ns["X_train"]) + len(ns["X_test"])))},

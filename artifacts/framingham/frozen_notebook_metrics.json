@@ -1,0 +1,180 @@
+{
+  "dataset_provenance": {
+    "dataset_sha256": "d54defaf08bac7c6d05cdebde17f220dcfd970f5b956db4a13092f4fcdeef151",
+    "file": "CHD_preprocessed.csv",
+    "kaggle_slug": "captainozlem/framingham-chd-preprocessed-data"
+  },
+  "exported_model_version_id": "qmedai-framingham-b98c306b5b44",
+  "identity": {
+    "algorithm": "sha256",
+    "inputs": {
+      "content_sha256": {
+        "classical": "382bfefd044fd621eaaeb0d612c52d76714cd38b47c152ca9e1d3bef535b9685",
+        "hybrid": "070f97b771704a490a3465490717066e5c7f36deb871d441b116b5d51a97fc7b",
+        "metrics": "2fdfed1bf1ef06a08f893797b831a70ae77e3240a659bedc74ac244993491b20",
+        "quantum": "9a260cb5e4290ec35d3bf89092a7f13214d8648e2e9df88962550106fd195c38"
+      },
+      "dataset_sha256": "d54defaf08bac7c6d05cdebde17f220dcfd970f5b956db4a13092f4fcdeef151",
+      "feature_order": [
+        "sex_male",
+        "age",
+        "education",
+        "currentSmoker",
+        "cigsPerDay",
+        "BPMeds",
+        "prevalentStroke",
+        "prevalentHyp",
+        "diabetes",
+        "totChol",
+        "sysBP",
+        "diaBP",
+        "BMI",
+        "heartRate",
+        "glucose"
+      ],
+      "metrics": [
+        {
+          "AUPRC": 0.3603,
+          "AUROC": 0.7345,
+          "Accuracy": 0.6989,
+          "F1": 0.3882,
+          "Model": "Logistic Regression",
+          "Precision": 0.2811,
+          "Sensitivity": 0.627,
+          "Specificity": 0.7118,
+          "Time_s": 0.0278
+        },
+        {
+          "AUPRC": 0.2727,
+          "AUROC": 0.7062,
+          "Accuracy": 0.7207,
+          "F1": 0.3419,
+          "Model": "Hybrid CML + QML",
+          "Precision": 0.2667,
+          "Sensitivity": 0.4762,
+          "Specificity": 0.7646,
+          "Time_s": 12.3486
+        },
+        {
+          "AUPRC": 0.3362,
+          "AUROC": 0.7016,
+          "Accuracy": 0.838,
+          "F1": 0.2299,
+          "Model": "Random Forest",
+          "Precision": 0.4167,
+          "Sensitivity": 0.1587,
+          "Specificity": 0.9601,
+          "Time_s": 1.4572
+        },
+        {
+          "AUPRC": 0.2581,
+          "AUROC": 0.6886,
+          "Accuracy": 0.8476,
+          "F1": 0.0,
+          "Model": "RBF-SVM",
+          "Precision": 0.0,
+          "Sensitivity": 0.0,
+          "Specificity": 1.0,
+          "Time_s": 2.6535
+        },
+        {
+          "AUPRC": 0.2903,
+          "AUROC": 0.6775,
+          "Accuracy": 0.8452,
+          "F1": 0.1795,
+          "Model": "HistGradientBoosting",
+          "Precision": 0.4667,
+          "Sensitivity": 0.1111,
+          "Specificity": 0.9772,
+          "Time_s": 0.4299
+        },
+        {
+          "AUPRC": 0.2535,
+          "AUROC": 0.6581,
+          "Accuracy": 0.8452,
+          "F1": 0.0154,
+          "Model": "Quantum Kernel SVM",
+          "Precision": 0.25,
+          "Sensitivity": 0.0079,
+          "Specificity": 0.9957,
+          "Time_s": 4.4046
+        }
+      ],
+      "seed": 42,
+      "selected_indices": [
+        1,
+        10,
+        7,
+        11
+      ]
+    }
+  },
+  "notebook_summary": [
+    {
+      "AUPRC": 0.3603,
+      "AUROC": 0.7345,
+      "Accuracy": 0.6989,
+      "F1": 0.3882,
+      "Model": "Logistic Regression",
+      "Precision": 0.2811,
+      "Sensitivity": 0.627,
+      "Specificity": 0.7118,
+      "Time_s": 0.0278
+    },
+    {
+      "AUPRC": 0.2727,
+      "AUROC": 0.7062,
+      "Accuracy": 0.7207,
+      "F1": 0.3419,
+      "Model": "Hybrid CML + QML",
+      "Precision": 0.2667,
+      "Sensitivity": 0.4762,
+      "Specificity": 0.7646,
+      "Time_s": 12.3486
+    },
+    {
+      "AUPRC": 0.3362,
+      "AUROC": 0.7016,
+      "Accuracy": 0.838,
+      "F1": 0.2299,
+      "Model": "Random Forest",
+      "Precision": 0.4167,
+      "Sensitivity": 0.1587,
+      "Specificity": 0.9601,
+      "Time_s": 1.4572
+    },
+    {
+      "AUPRC": 0.2581,
+      "AUROC": 0.6886,
+      "Accuracy": 0.8476,
+      "F1": 0.0,
+      "Model": "RBF-SVM",
+      "Precision": 0.0,
+      "Sensitivity": 0.0,
+      "Specificity": 1.0,
+      "Time_s": 2.6535
+    },
+    {
+      "AUPRC": 0.2903,
+      "AUROC": 0.6775,
+      "Accuracy": 0.8452,
+      "F1": 0.1795,
+      "Model": "HistGradientBoosting",
+      "Precision": 0.4667,
+      "Sensitivity": 0.1111,
+      "Specificity": 0.9772,
+      "Time_s": 0.4299
+    },
+    {
+      "AUPRC": 0.2535,
+      "AUROC": 0.6581,
+      "Accuracy": 0.8452,
+      "F1": 0.0154,
+      "Model": "Quantum Kernel SVM",
+      "Precision": 0.25,
+      "Sensitivity": 0.0079,
+      "Specificity": 0.9957,
+      "Time_s": 4.4046
+    }
+  ]
+}
