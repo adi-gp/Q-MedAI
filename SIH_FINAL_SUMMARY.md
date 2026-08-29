@@ -4,6 +4,24 @@
 
 Early disease-classification workflows can benefit from research ML assistance. Q-MedAI is a hybrid platform that compares strong classical baselines with quantum ML under one controlled, leakage-safe methodology. It is research software, not a medical diagnostic device.
 
+## Combined faculty demo
+
+The self-contained faculty application presents two evidence roles without merging their claims:
+
+- **Framingham is the primary prospective clinical workflow.** The real bundled frozen artifact set is READY with model ID `qmedai-framingham-b98c306b5b44`. Patient Risk produces classical, quantum, and hybrid **uncalibrated research-model scores**; these are not validated 10-year probabilities, diagnoses, risk categories, or treatment recommendations. The current utility verdict is **`CLASSICAL-PREFERRED`** because the supplied Framingham evidence favors Logistic Regression.
+- **Breast Cancer is a separate quantum evidence benchmark.** On the matched 150-row experiment, the utility verdict is **`QUANTUM-COMPETITIVE` with a selective sensitivity benefit against Random Forest**: the Quantum Kernel has sensitivity higher by 0.0238 and one fewer false negative. **RBF SVM remains strongest overall.**
+
+PennyLane `default.qubit` is a classical quantum-circuit simulator, not physical quantum hardware or evidence of computational speedup. Neither task is externally clinically validated, and neither result establishes universal quantum advantage.
+
+Launch from the current worktree:
+
+```bash
+cd /Users/mymac/Desktop/Q-MedAI/.worktrees/combined-faculty-demo
+/Users/mymac/Desktop/Q-MedAI/.venv/bin/streamlit run app.py --server.port 8511 --browser.gatherUsageStats false
+```
+
+Use the timed [Faculty Demo Guide](FACULTY_DEMO_GUIDE.md): run verified inference on **Patient Risk**, then open **Quantum Lab in the same browser session** to show that patient’s frozen transformation, encoded angles, four-qubit circuit, fidelity-kernel response, and Quantum research score.
+
 ## Architecture and methodology
 
 Local CSV → validation (B=0, M=1) → stratified split (seed 42) → train-only imputation/scaling/SelectKBest(`f_classif`) → models → held-out metrics and plots. Classical models are Logistic Regression, RBF SVM, and Random Forest. Quantum models are a 4-qubit VQC and a fidelity quantum-kernel SVM, both simulated with PennyLane `default.qubit`.
