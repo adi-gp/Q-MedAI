@@ -1415,4 +1415,19 @@ The final handoff must include:
 - confirmation that no production mock model was packaged;
 - exact commit SHA(s);
 - clickable links to `app.py`, `FACULTY_DEMO_GUIDE.md`, the design, the plan, and the faculty ZIP; and
-- the remaining action required to activate real Framingham inference: run the corrected exporter in the trained Kaggle notebook and install the resulting verified files.
+- the verified frozen Framingham artifact ID and a successful real patient-inference smoke result.
+
+---
+
+## Scope Update — Real Ready-Mode Demonstration (2026-08-29)
+
+The user explicitly expanded the final acceptance criteria after Task 6: the delivered faculty demo must include real frozen Framingham inference and an end-to-end browser walkthrough. This supersedes the earlier package-only/degraded-mode completion assumption.
+
+Before documentation and final packaging, implement and verify the following:
+
+1. Reproduce the executed Framingham notebook's seed-42 preprocessing, four-feature quantum map, 500-row quantum subset, quantum-kernel SVM, and leakage-safe hybrid stack from the exact public `CHD_preprocessed.csv` cohort.
+2. Use `kaggle/framingham_artifact_export.py` to export the already-fitted namespace into the canonical trusted directory `artifacts/framingham/`; do not handcraft, mock, or synthesize model outputs.
+3. Add a reproducible local build entry point and focused tests for ready-mode artifact loading and patient scoring.
+4. Verify SHA-256 checksums, matching runtime versions, exact feature/bundle metadata, and finite `[0, 1]` classical, quantum, and hybrid research scores for at least two valid patient inputs.
+5. Run the Streamlit app on port 8511, navigate it in a real browser, submit the Patient Risk form, verify all three score cards and the contribution table render, inspect every main page, and preserve screenshots as verification evidence.
+6. Commit the real frozen artifacts and browser-ready documentation so `git archive` creates a self-contained faculty demo. Keep all outputs labelled as uncalibrated research-model scores and keep the `default.qubit` classical-simulator disclosure.
