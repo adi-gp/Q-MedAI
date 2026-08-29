@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 import hashlib
+import html
 import json
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from src.demo.artifacts import inspect_framingham_artifacts, load_framingham_art
 from src.demo.contracts import ArtifactError, ArtifactStatus, PatientValidationError, TaskEvidence, UtilityVerdict
 from src.demo.evidence import load_breast_cancer_evidence, load_framingham_evidence
 from src.demo.framingham import PATIENT_FIELDS, predict_patient
+from src.demo.quantum_viz import build_quantum_trace
 from src.demo.styles import THEME_CSS
 from src.demo.utility import evaluate_utility, evidence_table
 from src.runner import MODEL_NAMES, run_experiment
@@ -30,9 +32,47 @@ PAGES = (
     "Provenance & Safety",
     "Research Runner",
 )
+
 QUANTUM_FEATURES = ("age", "sysBP", "prevalentHyp", "diaBP")
 FEATURE_MAP_SEQUENCE = "H → RY(x) → RZ(0.5x) → ring-CZ → RY(x²/π)"
 FEATURED_BREAST_PLOT = Path("results/plots/matched_classical_quantum_judge_summary.png")
+
+PAGE_COPY = {
+    "Command Center": (
+        "Faculty Command Center",
+        "One view of the prospective Framingham workflow, the separate breast-cancer evidence benchmark, "
+        "and the evidence-derived architecture recommendation.",
+    ),
+    "Patient Risk": (
+        "Patient Risk Analysis",
+        "Real frozen-model inference from the exact 15-field Framingham input contract. "
+        "The classical model remains the primary evidence-supported pathway.",
+    ),
+    "Quantum Lab": (
+        "Quantum Lab",
+        "Inspect the qubit-efficient feature representation and simulated fidelity-kernel pathway used by the research engine.",
+    ),
+    "Model Arena": (
+        "Model Arena",
+        "Compare classical, quantum, and hybrid evidence without hiding resource-budget differences or uncertainty limitations.",
+    ),
+    "Breast Cancer Evidence": (
+        "Breast Cancer Evidence",
+        "A separate matched diagnostic benchmark used to study selective quantum competitiveness—not a Framingham calculator.",
+    ),
+    "Quantum Utility": (
+        "Quantum Utility Engine",
+        "Task-specific architecture recommendations generated from measured evidence rather than assuming quantum is always better.",
+    ),
+    "Provenance & Safety": (
+        "Provenance & Safety",
+        "Trace the evidence sources, frozen-artifact gate, limitations, and simulator disclosures behind every displayed result.",
+    ),
+    "Research Runner": (
+        "Advanced Research Runner",
+        "Optional exploratory training. This is intentionally separated from the fast, frozen-artifact faculty demonstration.",
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -44,6 +84,10 @@ class DemoContext:
     breast_cancer_verdict: UtilityVerdict
     artifact_status: ArtifactStatus
     artifact_directory: Path | None = None
+
+
+def _safe(value: object) -> str:
+    return html.escape(str(value), quote=True)
 
 
 def _metric_frame(evidence: TaskEvidence) -> pd.DataFrame:
@@ -66,10 +110,29 @@ def _metric_frame(evidence: TaskEvidence) -> pd.DataFrame:
     return frame.dropna(axis=1, how="all")
 
 
+def _section(title: str, copy: str | None = None) -> None:
+    body = f"<div class='qm-section'><div class='qm-section-title'>{_safe(title)}</div>"
+    if copy:
+        body += f"<div class='qm-section-copy'>{_safe(copy)}</div>"
+    body += "</div>"
+    st.markdown(body, unsafe_allow_html=True)
+
+
+def _pill(text: str, purple: bool = False, dark: bool = False) -> str:
+    class_name = "qm-pill"
+    if purple:
+        class_name += " qm-pill-purple"
+    if dark:
+        class_name += " qm-pill-dark"
+    return f"<span class='{class_name}'>{_safe(text)}</span>"
+
+
 def _verdict_card(label: str, verdict: UtilityVerdict) -> None:
     st.markdown(
-        f"<div class='qm-verdict'><strong>{label}</strong><br>"
-        f"<code>{verdict.status}</code> — {verdict.headline}</div>",
+        "<div class='qm-verdict'>"
+        f"<div class='qm-verdict-label'>{_safe(label)}</div>"
+        f"<div class='qm-verdict-headline'>{_pill(verdict.status)} {_safe(verdict.headline)}</div>"
+        "</div>",
         unsafe_allow_html=True,
     )
 
@@ -121,238 +184,663 @@ def _signature(config: ExperimentConfig, selected_models: set[str]) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
+def _artifact_badge(context: DemoContext) -> str:
+    if context.artifact_status.ready:
+        return _pill("ARTIFACTS VERIFIED")
+    return _pill("EVIDENCE ONLY", dark=True)
+
+
+def _stat_grid(items: tuple[tuple[str, str, str], ...]) -> None:
+    cards = "".join(
+        "<div class='qm-stat'>"
+        f"<div class='qm-stat-label'>{_safe(label)}</div>"
+        f"<div class='qm-stat-value'>{_safe(value)}</div>"
+        f"<div class='qm-stat-note'>{_safe(note)}</div>"
+        "</div>"
+        for label, value, note in items
+    )
+    st.markdown(f"<div class='qm-stat-grid'>{cards}</div>", unsafe_allow_html=True)
+
+
 def render_command_center(context: DemoContext) -> None:
-    st.subheader("Faculty command center")
+    _section(
+        "Faculty command center",
+        "A concise product view of what Q-MedAI does, what evidence supports each pathway, "
+        "and where quantum processing is or is not currently justified.",
+    )
+
     st.markdown(
-        "<div class='qm-card'><strong>One platform, two evidence roles.</strong><br>"
+        "<div class='qm-card'>"
+        "<div class='qm-card-title'>One platform, two evidence roles</div>"
+        "<div class='qm-card-copy'>"
         "Framingham is the primary prospective 10-year CHD research workflow. "
-        "Breast Cancer is a separate, matched quantum evidence benchmark.</div>",
+        "Breast Cancer remains a separate matched diagnostic benchmark used to evaluate quantum competitiveness."
+        "</div></div>",
         unsafe_allow_html=True,
     )
-    first, second, third = st.columns(3)
-    first.metric("Framingham cohort", f"{context.framingham.cohort['rows']:,}")
-    second.metric("Framingham held-out rows", f"{context.framingham.cohort['test_rows']:,}")
-    third.metric("Artifact gate", "READY" if context.artifact_status.ready else "EVIDENCE ONLY")
-    st.markdown("#### Hybrid decision path")
-    st.markdown(
-        "**Baseline variables** → verified preprocessing → **Classical / Quantum / Hybrid research scores** "
-        "→ task-specific utility verdict. The utility verdict does not assert universal quantum advantage."
+
+    _stat_grid(
+        (
+            ("Framingham cohort", f"{context.framingham.cohort['rows']:,}", "baseline patient records"),
+            ("Held-out evaluation", f"{context.framingham.cohort['test_rows']:,}", "Framingham test rows"),
+            ("Inference gate", "READY" if context.artifact_status.ready else "LOCKED", "verified frozen artifacts"),
+        )
     )
-    left, right = st.columns(2)
+
+    _section(
+        "Hybrid decision path",
+        "Q-MedAI does not force quantum inference. It evaluates classical, quantum, and hybrid evidence, "
+        "then recommends the architecture supported by the current task.",
+    )
+
+    st.markdown(
+        "<div class='qm-flow'>"
+        "<div class='qm-flow-step'><div class='qm-flow-num'>01 · INPUT</div>"
+        "<div class='qm-flow-title'>Baseline variables</div><div class='qm-flow-copy'>15-field Framingham contract</div></div>"
+        "<div class='qm-flow-step'><div class='qm-flow-num'>02 · PROCESS</div>"
+        "<div class='qm-flow-title'>Verified preprocessing</div><div class='qm-flow-copy'>Frozen feature order and transforms</div></div>"
+        "<div class='qm-flow-step'><div class='qm-flow-num'>03 · INFER</div>"
+        "<div class='qm-flow-title'>CML · QML · Hybrid</div><div class='qm-flow-copy'>Parallel research pathways</div></div>"
+        "<div class='qm-flow-step'><div class='qm-flow-num'>04 · AUDIT</div>"
+        "<div class='qm-flow-title'>Utility decision</div><div class='qm-flow-copy'>Evidence-derived recommendation</div></div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    left, right = st.columns(2, gap="medium")
     with left:
         _verdict_card("Framingham · primary workflow", context.framingham_verdict)
     with right:
         _verdict_card("Breast Cancer · evidence benchmark", context.breast_cancer_verdict)
+
     if context.artifact_status.ready:
-        st.success(context.artifact_status.message)
+        st.success("Verified frozen Framingham artifacts are ready for real patient inference.")
     else:
         st.warning(f"{context.artifact_status.message} Patient inference is safely disabled.")
-    st.info("Quantum circuits run on PennyLane default.qubit, a classical simulator—not physical quantum hardware.")
+
+    st.info(
+        "Quantum circuits run on PennyLane default.qubit, a classical simulator. "
+        "The prototype does not claim physical-quantum speedup."
+    )
+
+
+# Field groups preserve the exact notebook contract while making the UI scannable.
+_PATIENT_GROUPS = (
+    (
+        "Demographics & behavior",
+        ("sex_male", "age", "education", "currentSmoker", "cigsPerDay"),
+    ),
+    (
+        "Vitals & laboratory",
+        ("totChol", "sysBP", "diaBP", "BMI", "heartRate", "glucose"),
+    ),
+    (
+        "Clinical history",
+        ("BPMeds", "prevalentStroke", "prevalentHyp", "diabetes"),
+    ),
+)
+
+
+def _field_lookup() -> dict[str, object]:
+    return {field.name: field for field in PATIENT_FIELDS}
+
+
+def _render_field(column, field) -> float:
+    if field.binary:
+        return float(
+            column.selectbox(
+                field.label,
+                options=(0, 1),
+                index=int(field.default),
+                format_func=lambda value: "Yes" if value else "No",
+                key=f"patient_{field.name}",
+            )
+        )
+    return float(
+        column.number_input(
+            field.label,
+            min_value=float(field.minimum),
+            max_value=float(field.maximum),
+            value=float(field.default),
+            step=float(field.step),
+            key=f"patient_{field.name}",
+        )
+    )
 
 
 def _patient_form(ready: bool) -> tuple[dict[str, float], bool]:
     values: dict[str, float] = {}
+    lookup = _field_lookup()
+
     with st.form("framingham_patient_form", clear_on_submit=False):
-        columns = st.columns(3)
-        for index, field in enumerate(PATIENT_FIELDS):
-            column = columns[index % len(columns)]
-            if field.binary:
-                values[field.name] = float(
-                    column.selectbox(
-                        field.label,
-                        options=(0, 1),
-                        index=int(field.default),
-                        format_func=lambda value: "Yes" if value else "No",
-                    )
-                )
-            else:
-                values[field.name] = float(
-                    column.number_input(
-                        field.label,
-                        min_value=float(field.minimum),
-                        max_value=float(field.maximum),
-                        value=float(field.default),
-                        step=float(field.step),
-                    )
-                )
-        submitted = st.form_submit_button("Run verified inference", type="primary") if ready else False
+        group_columns = st.columns(3, gap="large")
+
+        for group_column, (group_name, field_names) in zip(group_columns, _PATIENT_GROUPS):
+            with group_column:
+                st.markdown(f"<div class='qm-field-group'>{_safe(group_name)}</div>", unsafe_allow_html=True)
+                for field_name in field_names:
+                    values[field_name] = _render_field(group_column, lookup[field_name])
+
+        submitted = (
+            st.form_submit_button(
+                "Run verified inference",
+                type="primary",
+                width="stretch",
+            )
+            if ready
+            else False
+        )
+
     return values, submitted
 
 
+def _score_cards(classical_score: float, quantum_score: float, hybrid_score: float) -> None:
+    st.markdown(
+        "<div class='qm-score-grid'>"
+        "<div class='qm-score-card'>"
+        "<div class='qm-score-label'>Classical · primary</div>"
+        f"<div class='qm-score-value'>{classical_score:.3f}</div>"
+        "<div class='qm-score-note'>Evidence-supported Framingham pathway</div></div>"
+        "<div class='qm-score-card'>"
+        "<div class='qm-score-label'>Quantum · research</div>"
+        f"<div class='qm-score-value'>{quantum_score:.3f}</div>"
+        "<div class='qm-score-note'>4-qubit fidelity-kernel branch</div></div>"
+        "<div class='qm-score-card'>"
+        "<div class='qm-score-label'>Hybrid · research</div>"
+        f"<div class='qm-score-value'>{hybrid_score:.3f}</div>"
+        "<div class='qm-score-note'>Classical + quantum fusion branch</div></div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _contribution_table(contributions) -> None:
+    if not contributions:
+        return
+
+    frame = pd.DataFrame(contributions, columns=["Feature", "Model contribution"]).copy()
+    frame["Absolute contribution"] = frame["Model contribution"].abs()
+    frame = frame.sort_values("Absolute contribution", ascending=False).drop(columns=["Absolute contribution"])
+
+    _section(
+        "Top model associations",
+        "Largest Logistic Regression contributions for this patient. These are model associations, not causal medical explanations.",
+    )
+    st.dataframe(frame.head(8), hide_index=True, width="stretch")
+
+
 def render_patient_risk(context: DemoContext) -> None:
-    st.subheader("Framingham patient risk research workflow")
-    st.caption("Prospective 10-year CHD research · exact 15-field notebook input contract")
-    st.info(
-        "Patient values remain in this Streamlit session only. They are not written to files, analytics, "
-        "or authoritative evidence artifacts."
+    _section(
+        "Framingham patient risk research workflow",
+        "Enter baseline measurements once. Q-MedAI applies the frozen preprocessing and displays the "
+        "classical primary score beside the quantum and hybrid research branches.",
     )
-    st.caption(
-        "Outputs are uncalibrated research-model scores, not validated 10-year probabilities, diagnoses, "
-        "risk bands, or treatment recommendations."
+
+    st.markdown(
+        "<div class='qm-card'>"
+        "<div class='qm-card-title'>Privacy & interpretation boundary</div>"
+        "<div class='qm-card-copy'>Patient values remain in this Streamlit session only and are not persisted. "
+        "Outputs are uncalibrated research-model scores—not diagnoses, treatment recommendations, "
+        "or clinically validated 10-year probabilities.</div>"
+        "</div>",
+        unsafe_allow_html=True,
     )
+
     values, submitted = _patient_form(context.artifact_status.ready)
+
     if not context.artifact_status.ready:
         st.warning("Verified Framingham artifacts are not installed, so Q-MedAI will produce no patient score.")
-        st.button("Run verified inference", type="primary", disabled=True)
+        st.button("Run verified inference", type="primary", disabled=True, width="stretch")
         if context.artifact_status.missing_files:
             st.write("**Missing trusted files:**", ", ".join(context.artifact_status.missing_files))
         st.caption(
-            "Export the five frozen files with kaggle/framingham_artifact_export.py and place them in "
-            "artifacts/framingham. The application never substitutes example or synthetic scores."
+            "Export the frozen files with kaggle/framingham_artifact_export.py and place them in artifacts/framingham. "
+            "The application never substitutes synthetic scores."
         )
         return
-    if submitted:
-        try:
-            artifact_directory = context.artifact_directory or context.project_root / "artifacts/framingham"
-            artifacts = load_framingham_artifacts(artifact_directory)
-            result = predict_patient(artifacts, values)
-        except (ArtifactError, PatientValidationError) as exc:
-            st.error(f"Verified inference stopped safely: {exc}")
-            return
-        first, second, third = st.columns(3)
-        first.metric("Classical research-model score", f"{result.classical_score:.3f}")
-        second.metric("Quantum research score", f"{result.quantum_score:.3f}")
-        third.metric("Hybrid research score", f"{result.hybrid_score:.3f}")
-        st.success(f"Evidence-supported pathway: {result.recommended_pathway}")
-        if result.contributions:
-            st.markdown("#### Logistic Regression model associations")
-            st.dataframe(
-                pd.DataFrame(result.contributions, columns=["Feature", "Model contribution"]),
-                hide_index=True,
-                width="stretch",
-            )
+
+    if not submitted:
+        st.markdown(
+            "<div class='qm-empty'><strong>Ready for verified inference.</strong><br>"
+            "Complete or review the baseline fields above, then select <strong>Run verified inference</strong>. "
+            "The result uses the installed frozen artifacts; no retraining occurs.</div>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    try:
+        artifact_directory = context.artifact_directory or context.project_root / "artifacts/framingham"
+        artifacts = load_framingham_artifacts(artifact_directory)
+        result = predict_patient(artifacts, values)
+
+        # Session-only bridge to Quantum Lab.
+        # Nothing is written to disk or authoritative evidence files.
+        st.session_state["qmedai_latest_verified_patient"] = dict(values)
+        st.session_state["qmedai_latest_quantum_score"] = float(result.quantum_score)
+
+    except (ArtifactError, PatientValidationError) as exc:
+        st.error(f"Verified inference stopped safely: {exc}")
+        return
+
+    _section(
+        "Patient result",
+        "The classical pathway is shown as primary because the locked Framingham evidence currently favors it.",
+    )
+
+    st.markdown(
+        "<div class='qm-result-primary'>"
+        "<div class='qm-result-kicker'>Primary evidence-supported output</div>"
+        f"<div class='qm-result-score'>{result.classical_score:.3f}</div>"
+        "<div class='qm-result-copy'>Classical Logistic Regression research-model score · uncalibrated</div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    first, second, third = st.columns(3, gap="medium")
+    first.metric(
+        "Classical research-model score",
+        f"{result.classical_score:.3f}",
+    )
+    second.metric(
+        "Quantum research score",
+        f"{result.quantum_score:.3f}",
+    )
+    third.metric(
+        "Hybrid research score",
+        f"{result.hybrid_score:.3f}",
+    )
+
+    st.success(f"Evidence-supported pathway: {result.recommended_pathway}")
+    _verdict_card("Recommended architecture", context.framingham_verdict)
+    _contribution_table(result.contributions)
+
+    st.caption(
+        "Research prototype only. A change in model score is not itself a clinical risk category, diagnosis, "
+        "or treatment recommendation."
+    )
 
 
 def render_quantum_lab(context: DemoContext) -> None:
-    st.subheader("Quantum Lab · Framingham feature map")
-    st.write("**Mutual-information-selected variables:** " + " · ".join(QUANTUM_FEATURES))
+    _section(
+        "Quantum Lab · Framingham feature map",
+        "The quantum branch compresses the clinical representation into four selected dimensions and "
+        "evaluates similarity through a simulated fidelity kernel.",
+    )
+
+    st.markdown(
+        "<div class='qm-card'><div class='qm-card-title'>Selected quantum representation</div>"
+        "<div class='qm-feature-row'>"
+        + "".join(_pill(feature, purple=True) for feature in QUANTUM_FEATURES)
+        + "</div>"
+        "<div class='qm-card-copy'>Mutual-information-selected compact representation used by the frozen quantum branch.</div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    _stat_grid(
+        (
+            ("Qubits", "4", "compact patient representation"),
+            ("Backend", "default.qubit", "classical quantum-circuit simulator"),
+            ("Kernel", "Fidelity", "|⟨φ(x)|φ(z)⟩|²"),
+        )
+    )
+
+    st.markdown(
+        "<div class='qm-flow'>"
+        "<div class='qm-flow-step'><div class='qm-flow-num'>01</div>"
+        "<div class='qm-flow-title'>Select</div><div class='qm-flow-copy'>age · sysBP · prevalentHyp · diaBP</div></div>"
+        "<div class='qm-flow-step'><div class='qm-flow-num'>02</div>"
+        "<div class='qm-flow-title'>Encode</div><div class='qm-flow-copy'>clip standardized values and map to angles</div></div>"
+        "<div class='qm-flow-step'><div class='qm-flow-num'>03</div>"
+        "<div class='qm-flow-title'>Entangle</div><div class='qm-flow-copy'>H · RY · RZ · ring-CZ · re-upload</div></div>"
+        "<div class='qm-flow-step'><div class='qm-flow-num'>04</div>"
+        "<div class='qm-flow-title'>Compare</div><div class='qm-flow-copy'>fidelity to frozen reference states</div></div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    latest_patient = st.session_state.get("qmedai_latest_verified_patient")
+
+    if latest_patient is None:
+        st.info(
+            "Run verified inference on Patient Risk to inspect the latest patient's "
+            "real quantum encoding, circuit, and fidelity-kernel trace."
+        )
+
+        with st.expander("View exact feature-map contract"):
+            st.code(
+                "selected = [age, sysBP, prevalentHyp, diaBP]\n"
+                "encoded = clip(standardized[selected], -3, 3) * (pi / 3)\n"
+                f"feature_map = {FEATURE_MAP_SEQUENCE}\n"
+                "kernel(x, z) = |<state(x)|state(z)>|^2",
+                language="text",
+            )
+
+        st.warning(
+            "Backend disclosure: PennyLane default.qubit is an analytic classical simulator with no shot noise. "
+            "This demonstrates quantum-circuit semantics—not physical-hardware execution or computational speedup."
+        )
+        st.caption(
+            f"Feature-map contract: framingham_v1_h_rz_cz_reupload · {context.framingham.backend}"
+        )
+        return
+
+    if not context.artifact_status.ready:
+        st.warning(
+            "The latest patient trace cannot be reconstructed because the verified "
+            "Framingham artifact gate is not ready."
+        )
+        return
+
+    try:
+        artifact_directory = (
+            context.artifact_directory
+            or context.project_root / "artifacts/framingham"
+        )
+
+        artifacts = load_framingham_artifacts(artifact_directory)
+
+        trace = build_quantum_trace(
+            artifacts,
+            latest_patient,
+        )
+
+    except (ArtifactError, PatientValidationError) as exc:
+        st.error(f"Verified quantum trace stopped safely: {exc}")
+        return
+
+    _section(
+        "Latest verified patient quantum trace",
+        "These values come from the same frozen preprocessing, selected feature indices, "
+        "feature map, and training reference states used by verified quantum inference.",
+    )
+
+    st.markdown(
+        "**Raw value → transformed value → Encoded angle**"
+    )
+
+    trace_frame = pd.DataFrame(
+        {
+            "Quantum feature": trace.feature_names,
+            "Raw value": trace.raw_values,
+            "Transformed value": trace.transformed_values,
+            "Encoded angle": trace.encoded_angles,
+        }
+    )
+
+    st.dataframe(
+        trace_frame,
+        hide_index=True,
+        width="stretch",
+    )
+
+    _section(
+        "Patient-specific 4-qubit circuit",
+        "PennyLane renders the exact feature-map operations evaluated for this patient.",
+    )
+
     st.code(
-        "selected = [age, sysBP, prevalentHyp, diaBP]\n"
-        "encoded = clip(standardized[selected], -3, 3) * (pi / 3)\n"
-        f"feature_map = {FEATURE_MAP_SEQUENCE}\n"
-        "kernel(x, z) = |<state(x)|state(z)>|^2",
+        trace.circuit_text,
         language="text",
     )
-    st.markdown(
-        "The four-qubit circuit creates a simulated quantum state, then compares it with frozen training "
-        "reference states through a fidelity kernel. `ring-CZ` entangles each qubit with its neighbour."
+
+    st.caption(
+        "Circuit semantics: H → RY(θ) → RZ(0.5θ) → ring-CZ → RY(θ²/π). "
+        "Controlled-Z gates may appear as connected ● / Z symbols in the PennyLane drawer."
     )
+
+    _section(
+        "Fidelity-kernel response",
+        "The patient state is compared with the frozen quantum training reference states using "
+        "|⟨φ(x)|φ(z)⟩|².",
+    )
+
+    first, second, third, fourth = st.columns(4)
+
+    first.metric(
+        "Kernel max fidelity",
+        f"{trace.kernel_max:.3f}",
+    )
+
+    second.metric(
+        "Kernel mean fidelity",
+        f"{trace.kernel_mean:.3f}",
+    )
+
+    third.metric(
+        "Kernel median fidelity",
+        f"{trace.kernel_median:.3f}",
+    )
+
+    fourth.metric(
+        "References compared",
+        str(len(trace.kernel_similarities)),
+    )
+
+    quantum_score = st.session_state.get("qmedai_latest_quantum_score")
+
+    if quantum_score is not None:
+        st.metric(
+            "Latest quantum research score",
+            f"{float(quantum_score):.3f}",
+        )
+
+    similarities = pd.DataFrame(
+        {
+            "Reference": [
+                f"Reference {index + 1}"
+                for index in range(len(trace.kernel_similarities))
+            ],
+            "Fidelity": trace.kernel_similarities,
+        }
+    )
+
+    strongest = (
+        similarities
+        .sort_values("Fidelity", ascending=False)
+        .head(12)
+        .reset_index(drop=True)
+    )
+
+    with st.expander(
+        "Strongest frozen-reference similarities",
+        expanded=False,
+    ):
+        st.dataframe(
+            strongest,
+            hide_index=True,
+            width="stretch",
+        )
+
+        st.bar_chart(
+            strongest.set_index("Reference")["Fidelity"],
+            height=300,
+        )
+
+    with st.expander("View exact feature-map contract"):
+        st.code(
+            "selected = [age, sysBP, prevalentHyp, diaBP]\n"
+            "encoded = clip(standardized[selected], -3, 3) * (pi / 3)\n"
+            f"feature_map = {FEATURE_MAP_SEQUENCE}\n"
+            "kernel(x, z) = |<state(x)|state(z)>|^2",
+            language="text",
+        )
+
     st.warning(
         "Backend disclosure: PennyLane default.qubit is an analytic classical simulator with no shot noise. "
-        "This demonstrates quantum-circuit semantics, not physical-hardware execution or computational speedup."
+        "This demonstrates quantum-circuit semantics—not physical-hardware execution or computational speedup."
     )
-    st.caption(f"Feature-map contract: framingham_v1_h_rz_cz_reupload · {context.framingham.backend}")
 
+    st.caption(
+        f"Feature-map contract: framingham_v1_h_rz_cz_reupload · {context.framingham.backend}"
+    )
 
 def render_model_arena(context: DemoContext) -> None:
-    st.subheader("Model Arena · Framingham")
+    _section(
+        "Model Arena · Framingham",
+        "The table preserves the real locked evidence. Use ranking metrics such as ROC-AUC and AUPRC "
+        "instead of accuracy alone on this imbalanced CHD task.",
+    )
+
     _verdict_card("Task-specific utility", context.framingham_verdict)
     st.dataframe(_metric_frame(context.framingham), hide_index=True, width="stretch")
+
     st.warning(
-        "Unmatched resource comparison: quantum and hybrid models use 500 training rows and four features; "
-        "full-data classical models use 3,306 rows and 15 features. These results cannot establish quantum advantage."
+        "Resource-budget warning: quantum and hybrid models use 500 training rows and four features; "
+        "full-data classical models use 3,306 rows and 15 features. This table alone cannot establish quantum advantage."
     )
-    st.markdown("**How to read the table**")
-    st.write(
-        "ROC-AUC and AUPRC summarize ranking across thresholds. Accuracy, sensitivity, specificity, precision, "
-        "and F1 depend on the selected decision threshold. Runtime on default.qubit is simulator context only."
-    )
-    st.caption(
-        "One executed held-out split; per-model bootstrap only; no paired uncertainty, external validation, "
-        "or demonstrated probability calibration."
-    )
+
+    with st.expander("How to read these metrics"):
+        st.write(
+            "ROC-AUC and AUPRC summarize ranking across thresholds. Accuracy, sensitivity, specificity, precision, "
+            "and F1 depend on the decision threshold. Runtime on default.qubit is simulator context only."
+        )
+        st.caption(
+            "One executed held-out split; per-model bootstrap only; no paired uncertainty, external validation, "
+            "or demonstrated probability calibration."
+        )
 
 
 def render_breast_cancer_evidence(context: DemoContext) -> None:
-    st.subheader("Breast Cancer · quantum evidence benchmark")
-    st.caption("Separate cross-sectional diagnostic-classification benchmark; not a Framingham patient calculator.")
+    _section(
+        "Breast Cancer · quantum evidence benchmark",
+        "A separate cross-sectional diagnostic-classification benchmark used to test whether the quantum kernel "
+        "shows a selective benefit under a matched training budget.",
+    )
+
     _verdict_card("Matched 150-row verdict", context.breast_cancer_verdict)
     plot_paths = _breast_plot_paths(context.project_root)
+
     if plot_paths:
-        st.markdown("#### Featured matched judge figure")
+        _section("Featured matched judge figure")
         _render_breast_plot(context.project_root, plot_paths[0])
+
     st.dataframe(_metric_frame(context.breast_cancer), hide_index=True, width="stretch")
+
     deltas = context.breast_cancer_verdict.deltas
-    first, second, third = st.columns(3)
-    first.metric("Sensitivity Δ vs Random Forest", f"{deltas['sensitivity']:+.4f}")
-    second.metric("False-negative Δ vs Random Forest", f"{deltas['false_negatives']:+.0f}")
-    third.metric("ROC-AUC Δ vs Random Forest", f"{deltas['roc_auc']:+.4f}")
-    st.info(
-        "The Quantum Kernel shows a selective sensitivity benefit and one fewer false negative versus Random "
-        "Forest on this matched split. RBF SVM remains the strongest overall model by the declared ranking rule."
-    )
-    st.markdown("#### Authoritative evidence downloads")
-    download_columns = st.columns(4)
-    downloads = (
-        (context.project_root / "results/final_results.csv", "Download matched CSV", "text/csv"),
-        (context.project_root / "results/final_results.json", "Download evidence JSON", "application/json"),
-        (context.project_root / "results/final_config.json", "Download configuration", "application/json"),
-        (context.project_root / "SIH_FINAL_SUMMARY.md", "Download SIH final summary", "text/markdown"),
-    )
-    for column, (path, label, mime) in zip(download_columns, downloads):
-        with column:
-            _download(path, label, mime)
-    if len(plot_paths) > 1:
-        st.markdown("#### Additional authoritative result figures")
-        for plot_path in plot_paths[1:]:
-            _render_breast_plot(context.project_root, plot_path)
-    for limitation in context.breast_cancer.limitations:
-        st.caption(limitation)
-
-
-def render_quantum_utility(context: DemoContext) -> None:
-    st.subheader("Quantum Utility Engine")
-    st.write(
-        "Verdicts are deterministic and task-specific. They combine model deltas, comparison fairness, "
-        "uncertainty status, and backend—not promotional wording."
-    )
-    for evidence, verdict in (
-        (context.framingham, context.framingham_verdict),
-        (context.breast_cancer, context.breast_cancer_verdict),
-    ):
-        st.markdown(f"#### {evidence.title}")
-        _verdict_card(evidence.role.replace("_", " ").title(), verdict)
-        st.write(
-            f"**Reference:** {verdict.reference_model}  ·  **Candidate:** {verdict.candidate_model}  ·  "
-            f"**Best overall:** {verdict.best_overall_model}"
+    _stat_grid(
+        (
+            ("Sensitivity Δ", f"{deltas['sensitivity']:+.4f}", "Quantum Kernel vs Random Forest"),
+            ("False-negative Δ", f"{deltas['false_negatives']:+.0f}", "matched split"),
+            ("ROC-AUC Δ", f"{deltas['roc_auc']:+.4f}", "Quantum Kernel vs Random Forest"),
         )
+    )
+
+    st.info(
+        "The Quantum Kernel shows a selective sensitivity benefit and one fewer false negative versus Random Forest "
+        "on this matched split. RBF SVM remains strongest overall by the declared ranking rule."
+    )
+
+    with st.expander("Authoritative evidence downloads"):
+        download_columns = st.columns(4)
+        downloads = (
+            (context.project_root / "results/final_results.csv", "Matched CSV", "text/csv"),
+            (context.project_root / "results/final_results.json", "Evidence JSON", "application/json"),
+            (context.project_root / "results/final_config.json", "Configuration", "application/json"),
+            (context.project_root / "SIH_FINAL_SUMMARY.md", "Download SIH final summary", "text/markdown"),
+        )
+        for column, (path, label, mime) in zip(download_columns, downloads):
+            with column:
+                _download(path, label, mime)
+
+    if len(plot_paths) > 1:
+        with st.expander("Additional authoritative result figures"):
+            for plot_path in plot_paths[1:]:
+                _render_breast_plot(context.project_root, plot_path)
+
+    with st.expander("Benchmark limitations"):
+        for limitation in context.breast_cancer.limitations:
+            st.caption(limitation)
+
+
+def _utility_block(evidence: TaskEvidence, verdict: UtilityVerdict) -> None:
+    st.markdown(f"### {_safe(evidence.title)}")
+    _verdict_card(evidence.role.replace("_", " ").title(), verdict)
+
+    _stat_grid(
+        (
+            ("Reference", verdict.reference_model, "comparison baseline"),
+            ("Candidate", verdict.candidate_model, "architecture under evaluation"),
+            ("Best overall", verdict.best_overall_model, "declared ranking rule"),
+        )
+    )
+
+    with st.expander("Measured candidate-minus-reference deltas"):
         st.dataframe(
             pd.DataFrame(
                 ((metric.replace("_", " ").title(), value) for metric, value in verdict.deltas.items()),
-                columns=["Candidate minus reference", "Delta"],
+                columns=["Metric", "Delta"],
             ),
             hide_index=True,
             width="stretch",
         )
+
+    with st.expander("Why Q-MedAI reached this verdict"):
         for reason in verdict.rationale:
-            st.caption(reason)
-    st.warning("No result here is a universal quantum-advantage claim.")
+            st.write(f"• {reason}")
+
+
+def render_quantum_utility(context: DemoContext) -> None:
+    _section(
+        "Quantum Utility Engine",
+        "The platform makes a task-specific architecture recommendation from measured deltas, comparison fairness, "
+        "uncertainty status, and backend constraints.",
+    )
+
+    _utility_block(context.framingham, context.framingham_verdict)
+    st.markdown("<div class='qm-divider'></div>", unsafe_allow_html=True)
+    _utility_block(context.breast_cancer, context.breast_cancer_verdict)
+
+    st.warning("No result on this page should be interpreted as a universal quantum-advantage claim.")
 
 
 def render_provenance(context: DemoContext) -> None:
-    st.subheader("Provenance & Safety")
-    st.markdown("#### Evidence sources")
-    st.write(f"**Framingham:** {context.framingham.source}")
-    st.write(f"**Breast Cancer:** {context.breast_cancer.source}")
-    st.write("**Framingham cohort:**", dict(context.framingham.cohort))
-    st.write("**Breast Cancer matched cohort:**", dict(context.breast_cancer.cohort))
-    st.write(f"**Artifact status:** {context.artifact_status.code} — {context.artifact_status.message}")
+    _section(
+        "Provenance & Safety",
+        "Every displayed result is tied to a local evidence source or a checksum-verified frozen artifact set.",
+    )
+
+    _stat_grid(
+        (
+            ("Framingham rows", f"{context.framingham.cohort['rows']:,}", "prospective CHD cohort"),
+            ("Breast-cancer train", f"{context.breast_cancer.cohort['train_rows']:,}", "matched benchmark rows"),
+            ("Artifact gate", context.artifact_status.code, context.artifact_status.message),
+        )
+    )
+
+    st.markdown(
+        "<div class='qm-card'><div class='qm-card-title'>Evidence sources</div>"
+        f"<div class='qm-card-copy'><strong>Framingham:</strong> {_safe(context.framingham.source)}<br>"
+        f"<strong>Breast Cancer:</strong> {_safe(context.breast_cancer.source)}</div></div>",
+        unsafe_allow_html=True,
+    )
+
+    with st.expander("Cohort details"):
+        st.write("**Framingham cohort:**", dict(context.framingham.cohort))
+        st.write("**Breast Cancer matched cohort:**", dict(context.breast_cancer.cohort))
+
     if context.artifact_status.ready and context.artifact_status.manifest is not None:
-        st.markdown("#### Verified frozen-artifact manifest")
-        st.json(dict(context.artifact_status.manifest))
+        with st.expander("Verified frozen-artifact manifest"):
+            st.json(dict(context.artifact_status.manifest))
     else:
         st.warning("No manifest data is displayed because a complete verified artifact set is not installed.")
         if context.artifact_status.missing_files:
             st.write("**Missing files:**", ", ".join(context.artifact_status.missing_files))
-    st.markdown("#### Full Framingham limitations")
-    for limitation in context.framingham.limitations:
-        st.write(f"- {limitation}")
-    st.markdown("#### Safety boundary")
-    st.write(
-        "Research and faculty demonstration only. Not a medical device; not clinically validated; no diagnosis, "
-        "treatment recommendation, calibrated probability, or patient-data persistence. Arbitrary uploaded "
-        "pickle/joblib files are unsupported because deserialization can execute code."
+
+    with st.expander("Full Framingham limitations"):
+        for limitation in context.framingham.limitations:
+            st.write(f"• {limitation}")
+
+    _section("Safety boundary")
+    st.markdown(
+        "<div class='qm-card'><div class='qm-card-copy'>"
+        "<strong>Research and faculty demonstration only.</strong> Not a medical device; not clinically validated; "
+        "no diagnosis, treatment recommendation, calibrated probability, or patient-data persistence. "
+        "Arbitrary uploaded pickle/joblib files are unsupported because deserialization can execute code."
+        "</div></div>",
+        unsafe_allow_html=True,
     )
+
     files = (
         (context.project_root / "results/framingham/notebook_metrics.json", "Download Framingham metrics"),
         (context.project_root / "results/final_results.json", "Download Breast Cancer evidence"),
@@ -362,35 +850,56 @@ def render_provenance(context: DemoContext) -> None:
 
 
 def render_research_runner() -> None:
-    st.subheader("Research Runner")
-    st.caption("This is exploratory and session-only. Session-only runs never overwrite authoritative artifacts.")
-    method = st.radio("Feature reduction", ("SelectKBest", "PCA"), horizontal=True)
-    feature_count = st.selectbox("Output features / quantum qubits", SUPPORTED_FEATURE_COUNTS, index=0)
-    if method == "PCA":
-        st.info("PCA components are transformed combinations of original biomarkers, not individual biomarkers.")
-    selected = {name for name in MODEL_NAMES if st.checkbox(name, value=True, key=f"explore_{name}")}
-    first, second, third = st.columns(3)
-    layers = first.number_input("VQC layers", min_value=1, max_value=3, value=3, step=1)
-    iterations = second.number_input("VQC iterations", min_value=1, max_value=100, value=100, step=1)
-    subset = third.number_input(
-        "Quantum-kernel training subset", min_value=2, max_value=MAX_KERNEL_SUBSET_SIZE, value=150, step=1
+    _section(
+        "Advanced Research Runner",
+        "Optional exploratory training for development use. Faculty patient inference does not require this page.",
     )
-    config = ExperimentConfig(
-        reduction_method=method,
-        n_features=int(feature_count),
-        vqc_layers=int(layers),
-        vqc_iterations=int(iterations),
-        kernel_subset_size=int(subset),
+
+    st.warning(
+        "This page can take many minutes when VQC or the quantum kernel is enabled. "
+        "Use Patient Risk for the fast frozen-artifact demonstration."
     )
-    signature = _signature(config, selected)
-    if st.button("🚀 Run Experiment", type="primary"):
-        st.session_state["exploratory_status"] = "TRAINING"
-        with st.spinner("Training selected exploratory models…"):
-            st.session_state["exploratory_result"] = run_experiment(config, selected_models=selected)
-            st.session_state["exploratory_signature"] = signature
-            st.session_state["exploratory_status"] = "COMPLETED"
+
+    with st.expander("Configure exploratory experiment", expanded=False):
+        method = st.radio("Feature reduction", ("SelectKBest", "PCA"), horizontal=True)
+        feature_count = st.selectbox("Output features / quantum qubits", SUPPORTED_FEATURE_COUNTS, index=0)
+
+        if method == "PCA":
+            st.info("PCA components are transformed combinations of original biomarkers, not individual biomarkers.")
+
+        selected = {name for name in MODEL_NAMES if st.checkbox(name, value=True, key=f"explore_{name}")}
+
+        first, second, third = st.columns(3)
+        layers = first.number_input("VQC layers", min_value=1, max_value=3, value=3, step=1)
+        iterations = second.number_input("VQC iterations", min_value=1, max_value=100, value=100, step=1)
+        subset = third.number_input(
+            "Quantum-kernel training subset",
+            min_value=2,
+            max_value=MAX_KERNEL_SUBSET_SIZE,
+            value=150,
+            step=1,
+        )
+
+        config = ExperimentConfig(
+            reduction_method=method,
+            n_features=int(feature_count),
+            vqc_layers=int(layers),
+            vqc_iterations=int(iterations),
+            kernel_subset_size=int(subset),
+        )
+
+        signature = _signature(config, selected)
+
+        if st.button("Run exploratory experiment", type="primary"):
+            st.session_state["exploratory_status"] = "TRAINING"
+            with st.spinner("Training selected exploratory models…"):
+                st.session_state["exploratory_result"] = run_experiment(config, selected_models=selected)
+                st.session_state["exploratory_signature"] = signature
+                st.session_state["exploratory_status"] = "COMPLETED"
+
     status = st.session_state.get("exploratory_status", "NOT TRAINED")
     st.write(f"**Experiment Status: {status}**")
+
     result = st.session_state.get("exploratory_result")
     if result is not None:
         if st.session_state.get("exploratory_signature") != signature:
@@ -404,6 +913,19 @@ def _run_new_experiment() -> None:
     render_research_runner()
 
 
+def _render_page_hero(page: str, context: DemoContext) -> None:
+    title, copy = PAGE_COPY[page]
+    st.markdown(
+        "<div class='qm-shell'>"
+        "<div class='qm-hero'>"
+        "<div class='qm-eyebrow'>Q-MedAI · SIH 26139 · faculty prototype</div>"
+        f"<div class='qm-hero-title'>{_safe(title)}</div>"
+        f"<div class='qm-hero-copy'>{_safe(copy)}</div>"
+        "</div></div>",
+        unsafe_allow_html=True,
+    )
+
+
 def render_app(project_root: Path, artifact_directory: Path | None = None) -> None:
     """Render the faculty app using a local trusted artifact directory.
 
@@ -414,6 +936,7 @@ def render_app(project_root: Path, artifact_directory: Path | None = None) -> No
     breast = load_breast_cancer_evidence(project_root / "results/final_results.json")
     resolved_artifact_directory = artifact_directory or project_root / "artifacts/framingham"
     status = inspect_framingham_artifacts(resolved_artifact_directory)
+
     context = DemoContext(
         project_root=project_root,
         framingham=framingham,
@@ -425,16 +948,20 @@ def render_app(project_root: Path, artifact_directory: Path | None = None) -> No
     )
 
     st.markdown(THEME_CSS, unsafe_allow_html=True)
-    st.title("Q-MedAI Clinical Intelligence")
-    st.markdown(
-        "<div class='qm-hero'><div class='qm-eyebrow'>SIH 26139 · FACULTY EVIDENCE CONSOLE</div>"
-        "<h3>Framingham early-risk workflow + Breast Cancer quantum evidence</h3>"
-        "Task-specific classical, quantum, and hybrid evidence with verification-gated inference.</div>",
-        unsafe_allow_html=True,
-    )
-    st.caption("Research prototype · no patient data persistence · not a medical device")
+
     page = st.sidebar.radio("Navigate", PAGES, index=0)
-    st.sidebar.caption("Framingham is the primary workflow. Breast Cancer is a separate benchmark.")
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**Q-MedAI**")
+    st.sidebar.caption("Framingham is the primary prospective workflow.")
+    st.sidebar.caption("Breast Cancer is a separate quantum evidence benchmark.")
+    st.sidebar.caption("Research prototype · not a medical device")
+
+    st.title("Q-MedAI Clinical Intelligence")
+    _render_page_hero(page, context)
+
+    if page == "Research Runner":
+        render_research_runner()
+        return
 
     renderers = {
         "Command Center": render_command_center,
@@ -445,10 +972,7 @@ def render_app(project_root: Path, artifact_directory: Path | None = None) -> No
         "Quantum Utility": render_quantum_utility,
         "Provenance & Safety": render_provenance,
     }
-    if page == "Research Runner":
-        render_research_runner()
-    else:
-        renderers[page](context)
+    renderers[page](context)
 
 
 __all__ = [
